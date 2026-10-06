@@ -12,7 +12,7 @@
 // 🔗 URL DEL APPS SCRIPT — pegá acá la URL de la implementación (termina en /exec)
 //    Ver docs/INSTALACION.md, paso 4.
 // ============================================================================
-const API_URL = 'https://script.google.com/macros/s/AKfycbyNYlThcQgB0ocNMQcmqg0v7uU90uLQuC49AXry3oVyXjvi7Evq8wjog3l0CrrrPjva/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzg7uWBh9wJOFa7GePVA6AywcyyC64P5InHCI7wFSbylsi6YciJrrzjNGvYU0w3tTPTEQ/exec';
 </script>
 <style>
 :root {
@@ -254,7 +254,7 @@ async function apiPost(accion, datos) {
       body: JSON.stringify({ token: ADMIN_KEY, accion: accion, datos: datos }) });
     res = await r.json();
   }
-  if (!res.ok) throw new Error(res.error || 'Error desconocido');
+  if (!res.ok && !res.confirmar) throw new Error(res.error || 'Error desconocido');
   return res;
 }
 
@@ -644,9 +644,9 @@ function vistaCarga() {
 
   // ---- Llamadas
   h += '<div class="h-sec">Llamadas · ' + esc(info.etiqueta) + '</div><div class="card"><div class="sub">El % atendidas y el TMO que puntúan salen del CSV de <b>entrantes</b>. El de salientes se guarda como dato informativo. ' +
-    'Columnas esperadas: <span class="mono">Agent, % Calls Serviced, Talk Time Mean</span> (el agente se reconoce por la extensión).</div>' +
+    'Elegí el archivo tal cual sale de 3CX (<span class="mono">agents_in_queue_statistics</span> o <span class="mono">outbound_calls</span>): se guarda solo en ' + esc(info.etiqueta) + '. La tabla de abajo muestra lo guardado y sirve para corregir a mano.</div>' +
     '<div class="acciones" style="margin-bottom:10px"><span class="btn file">Importar CSV entrantes<input type="file" accept=".csv,text/csv" id="csvIn"></span>' +
-    '<span class="btn file">Importar CSV salientes<input type="file" accept=".csv,text/csv" id="csvOut"></span><span class="nota" id="csvMsg"></span></div>' +
+    '<span class="btn file">Importar CSV salientes<input type="file" accept=".csv,text/csv" id="csvOut"></span><span class="nota" id="csvMsg">' + esc(MSG_LLAMADAS) + '</span></div>' +
     '<div class="scroll"><table class="t tbl-inp"><thead><tr><th>Agente</th><th>% Atendidas</th><th>TMO (m:ss)</th><th>Llamadas</th><th>TMO salientes</th><th>Salientes</th></tr></thead><tbody>' +
     dm.agentes.slice().sort((x, y) => x.ext.localeCompare(y.ext)).map((a) => {
       const C = a.llamadas;
@@ -657,7 +657,7 @@ function vistaCarga() {
         '<td><input class="inp sm" name="tmoSal" value="' + (C.tmoSalientes === null ? '' : C.tmoSalientesTxt) + '"></td>' +
         '<td><input class="inp sm" name="salientes" inputmode="numeric" value="' + (C.salientes ?? '') + '"></td></tr>';
     }).join('') + '</tbody></table></div>' +
-    '<div class="acciones" style="margin-top:10px"><button class="btn pri" id="btnLlamadas">Guardar llamadas</button></div></div>';
+    '<div class="acciones" style="margin-top:10px"><button class="btn" id="btnLlamadas">Guardar correcciones</button></div></div>';
 
   // ---- Campañas
   h += '<div class="h-sec">Campañas ganadas · ' + esc(info.etiqueta) + '</div><div class="card"><form id="fCamp"><div class="f-row" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">' +
@@ -798,42 +798,10 @@ async function publicar(valor) {
 }
 
 // ============================================================================
-// CSV DE LLAMADAS
-// Acepta los dos formatos de la central:
-//  - Resumen por agente y cola ("% de llamadas atendidas por agente"):
-//      Queue, Agent, Calls Answered, % Calls Serviced, Talk Time Total, Talk Time Mean...
-//  - Registro llamada por llamada (outbound_calls):
-//      Call Time, Caller ID, Caller Display name, Status, Talking...
+// IMPORTAR ARCHIVOS DE 3CX (llamadas)
+// La web solo lee el archivo y lo manda: el Apps Script lo resume y lo guarda
+// en el mes seleccionado (acción importarLlamadas).
 // ============================================================================
-
-/** Parte un CSV completo respetando comillas (incluso saltos de línea dentro de comillas). */
-function leerCsv(texto) {
-  if (texto.charCodeAt(0) === 0xFEFF) texto = texto.slice(1);
-  const fin = texto.indexOf('\n');
-  const primera = fin < 0 ? texto : texto.slice(0, fin);
-  const sep = primera.split(';').length > primera.split(',').length ? ';' : ',';
-  const filas = [];
-  let fila = [], cur = '', q = false;
-  for (let i = 0; i < texto.length; i++) {
-    const ch = texto[i];
-    if (q) {
-      if (ch === '"' && texto[i + 1] === '"') { cur += '"'; i++; }
-      else if (ch === '"') q = false;
-      else cur += ch;
-    } else if (ch === '"') q = true;
-    else if (ch === sep) { fila.push(cur.trim()); cur = ''; }
-    else if (ch === '\n' || ch === '\r') {
-      if (ch === '\r' && texto[i + 1] === '\n') i++;
-      fila.push(cur.trim()); cur = '';
-      if (fila.some((c) => c !== '')) filas.push(fila);
-      fila = [];
-    } else cur += ch;
-  }
-  fila.push(cur.trim());
-  if (fila.some((c) => c !== '')) filas.push(fila);
-  return filas;
-}
-
 function numeroCsv(s) { if (s == null || s === '') return null; const n = Number(String(s).replace('%', '').replace(',', '.').trim()); return isNaN(n) ? null : n; }
 function segundosCsv(s) {
   if (!s) return null;
@@ -842,131 +810,38 @@ function segundosCsv(s) {
   return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p.length === 2 ? p[0] * 60 + p[1] : p[0];
 }
 
-/**
- * Reconoce al agente por la extensión, pero exige que el nombre también se parezca.
- * Así "7997 Isabel Crosa" NO se le asigna a Gianine aunque tengan la misma extensión.
- * Devuelve { nombre } o { motivo }.
- */
-function matchAgente(txt, agentes) {
-  const s = String(txt || '');
-  const ext = (s.match(/^\s*(\d{3,5})\b/) || s.match(/\((\d{3,5})\)\s*$/) || [])[1];
-  const nombreCsv = sinTildes(s.replace(/\(\d+\)/g, '').replace(/^\s*\d+\s*/, ''));
-  const tokens = nombreCsv.split(/\s+/).filter((t) => t.length >= 3);
-  const parecido = (oficial) => sinTildes(oficial).split(/\s+/).some((o) => tokens.some((t) => o.slice(0, 4) === t.slice(0, 4)));
-  if (ext) {
-    const a = agentes.filter((x) => x.ext === ext)[0];
-    if (!a) return { motivo: 'no está en el ranking' };
-    if (!tokens.length || parecido(a.nombre)) return { nombre: a.nombre };
-    return { motivo: 'la extensión ' + ext + ' es de ' + a.nombre + ' pero el nombre no coincide' };
-  }
-  const a = agentes.filter((x) => sinTildes(x.nombre) === nombreCsv)[0];
-  return a ? { nombre: a.nombre } : { motivo: 'no está en el ranking' };
-}
-
-/**
- * Resume un CSV de llamadas por agente.
- * tipo 'entrantes': % atendidas = Σ atendidas ÷ Σ ofrecidas (ofrecidas de cada cola = atendidas ÷ %),
- *                   TMO = Σ tiempo hablado ÷ Σ atendidas. Las colas sin atendidas no pesan.
- * tipo 'salientes': cantidad de llamadas contestadas y TMO de las contestadas.
- * Devuelve { formato, porAgente: {nombre: {pct, tmo, llamadas}}, ignorados: [{texto, motivo, filas}], meses: [] }
- */
-function resumirCsvLlamadas(texto, tipo, agentes) {
-  const filas = leerCsv(texto);
-  if (filas.length < 2) throw new Error('El CSV está vacío.');
-  const enc = filas[0].map((h) => h.trim().toLowerCase());
-  const col = (fn) => enc.findIndex(fn);
-  const ignorados = {}, acc = {}, meses = {};
-  const ignorar = (txt, motivo) => { const k = txt + '|' + motivo; (ignorados[k] = ignorados[k] || { texto: txt, motivo: motivo, filas: 0 }).filas++; };
-  const esCentral = (t) => !t || /call center|^totals?$/i.test(t.replace(/^\s*\d+\s*/, ''));
-
-  const iCaller = col((h) => h === 'caller id'), iStatus = col((h) => h === 'status'), iTalking = col((h) => h === 'talking');
-  if (iCaller >= 0 && iStatus >= 0 && iTalking >= 0) {
-    // ---- Registro llamada por llamada
-    if (tipo === 'entrantes') throw new Error('Este archivo es un registro llamada por llamada (salientes). Para entrantes usá el reporte "% de llamadas atendidas por agente".');
-    const iNom = col((h) => h === 'caller display name'), iFecha = col((h) => h === 'call time');
-    filas.slice(1).forEach((c) => {
-      if (/^totals?$/i.test(c[0])) return;
-      const id = c[iCaller] || '';
-      const txt = iNom >= 0 && c[iNom] ? c[iNom].replace(/\(\d+\)\s*$/, '').trim() : '';
-      if (iFecha >= 0 && /^\d{4}-\d{2}/.test(c[iFecha])) meses[c[iFecha].slice(0, 7)] = true;
-      const m = matchAgente(id + ' ' + txt, agentes);
-      if (!m.nombre) { ignorar((id + ' ' + txt).trim(), m.motivo); return; }
-      const a = acc[m.nombre] = acc[m.nombre] || { contestadas: 0, hablado: 0, intentos: 0 };
-      a.intentos++;
-      if (sinTildes(c[iStatus]) === 'answered') { a.contestadas++; a.hablado += segundosCsv(c[iTalking]) || 0; }
-    });
-    const porAgente = {};
-    Object.keys(acc).forEach((n) => {
-      const a = acc[n];
-      porAgente[n] = { pct: null, tmo: a.contestadas ? Math.round(a.hablado / a.contestadas) : null, llamadas: a.contestadas, intentos: a.intentos };
-    });
-    return { formato: 'registro', porAgente: porAgente, ignorados: Object.values(ignorados), meses: Object.keys(meses).sort() };
-  }
-
-  // ---- Resumen por agente (y por cola)
-  const iAg = col((h) => h === 'agent' || h === 'agente');
-  const iPct = col((h) => h.indexOf('serviced') >= 0);
-  const iCant = col((h) => h === 'calls answered' || h === 'calls');
-  const iTot = col((h) => h === 'talk time total');
-  const iMed = col((h) => h === 'talk time mean');
-  if (iAg < 0 || (iMed < 0 && iTot < 0)) throw new Error('No reconozco el formato: faltan las columnas "Agent" y "Talk Time Mean".');
-  if (tipo === 'entrantes' && iPct < 0) throw new Error('Este CSV no trae "% Calls Serviced". ¿Es el de entrantes?');
-  filas.slice(1).forEach((c) => {
-    const txt = c[iAg] || '';
-    if (esCentral(txt)) return;
-    const m = matchAgente(txt, agentes);
-    if (!m.nombre) { ignorar(txt, m.motivo); return; }
-    const a = acc[m.nombre] = acc[m.nombre] || { atendidas: 0, ofrecidas: 0, hablado: 0, pctSimple: [], tmoSimple: [] };
-    const cant = iCant >= 0 ? numeroCsv(c[iCant]) : null;
-    const pct = iPct >= 0 ? numeroCsv(c[iPct]) : null;
-    if (cant === null) {   // sin cantidades: promedio simple
-      if (pct !== null) a.pctSimple.push(pct);
-      if (iMed >= 0) a.tmoSimple.push(segundosCsv(c[iMed]));
-      return;
-    }
-    if (!cant) return;     // cola sin llamadas atendidas: no pesa
-    a.atendidas += cant;
-    if (pct) a.ofrecidas += cant / (pct / 100);
-    a.hablado += iTot >= 0 ? segundosCsv(c[iTot]) : segundosCsv(c[iMed]) * cant;
-  });
-  const prom = (v) => v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
-  const porAgente = {};
-  Object.keys(acc).forEach((n) => {
-    const a = acc[n];
-    if (a.atendidas) porAgente[n] = { pct: a.ofrecidas ? Math.round(a.atendidas / a.ofrecidas * 1000) / 10 : null, tmo: Math.round(a.hablado / a.atendidas), llamadas: a.atendidas };
-    else if (a.pctSimple.length || a.tmoSimple.length) porAgente[n] = { pct: prom(a.pctSimple) === null ? null : Math.round(prom(a.pctSimple) * 10) / 10, tmo: prom(a.tmoSimple) === null ? null : Math.round(prom(a.tmoSimple)), llamadas: null };
-  });
-  return { formato: 'resumen', porAgente: porAgente, ignorados: Object.values(ignorados), meses: [] };
-}
+let MSG_LLAMADAS = '';
 
 function importarCsv(ev, tipo) {
-  const file = ev.target.files[0];
+  const input = ev.target, file = input.files[0];
   if (!file) return;
   const lector = new FileReader();
-  lector.onload = () => {
+  lector.onload = async () => {
+    $('csvMsg').textContent = 'Importando ' + file.name + '…';
+    document.querySelectorAll('.file').forEach((b) => b.setAttribute('disabled', ''));
     try {
-      const r = resumirCsvLlamadas(lector.result, tipo, RESP.equipo.agentes);
+      const datos = { mes: MES, tipo: tipo, texto: lector.result };
+      let r = await apiPost('importarLlamadas', datos);
+      if (r.confirmar) {
+        if (!confirm(r.confirmar)) { $('csvMsg').textContent = 'Cancelado: no se guardó nada.'; return; }
+        datos.confirmarMes = true;
+        r = await apiPost('importarLlamadas', datos);
+      }
       const nombres = Object.keys(r.porAgente);
-      if (!nombres.length) throw new Error('Ningún agente del CSV coincide con el equipo.');
-      if (r.meses.length && (r.meses.length > 1 || r.meses[0] !== MES) &&
-        !confirm('El archivo tiene llamadas de ' + r.meses.join(', ') + ' y estás cargando ' + mesInfo(MES).etiqueta + '. ¿Seguir igual?')) { ev.target.value = ''; return; }
-      nombres.forEach((nombre) => {
-        const a = r.porAgente[nombre], tr = document.querySelector('tr[data-ag="' + cssEsc(nombre) + '"]');
-        if (!tr) return;
-        const set = (name, v) => { if (v === null || v === undefined) return; const i = tr.querySelector('input[name=' + name + ']'); i.value = v; i.style.borderColor = 'var(--accent)'; };
-        if (tipo === 'entrantes') { set('pct', a.pct); set('tmo', a.tmo === null ? null : segTxt(a.tmo)); set('llamadas', a.llamadas); }
-        else { set('tmoSal', a.tmo === null ? null : segTxt(a.tmo)); set('salientes', a.llamadas); }
-      });
       const raros = r.ignorados.filter((g) => g.motivo !== 'no está en el ranking');
-      const otros = r.ignorados.length - raros.length;
-      $('csvMsg').textContent = 'CSV ' + tipo + ': ' + nombres.length + ' agentes reconocidos' +
-        (otros ? ' · ' + otros + ' extensiones fuera del ranking ignoradas' : '') +
-        (raros.length ? ' · ⚠ ignorado: ' + raros.map((g) => g.texto + ' (' + g.motivo + ', ' + g.filas + ' filas)').join('; ') : '') +
-        '. Revisá y tocá "Guardar llamadas".';
-    } catch (e) { toast('CSV: ' + e.message, true); }
-    ev.target.value = '';
+      MSG_LLAMADAS = '✓ ' + file.name + ': llamadas ' + tipo + ' guardadas para ' + nombres.length + ' agentes.' +
+        (raros.length ? ' ⚠ Ignorado: ' + raros.map((g) => g.texto + ' (' + g.motivo + ', ' + g.filas + ' filas)').join('; ') + '.' : '');
+      await refrescar();
+      toast('Llamadas ' + tipo + ' importadas');
+    } catch (e) {
+      $('csvMsg').textContent = '';
+      toast('No se importó: ' + e.message, true);
+    } finally {
+      document.querySelectorAll('.file').forEach((b) => b.removeAttribute('disabled'));
+    }
   };
   lector.readAsText(file, 'UTF-8');
+  input.value = '';
 }
 
 async function guardarLlamadas() {
