@@ -300,6 +300,8 @@ async function refrescar() {
   RESP = r;
   try { if (!MODO_MOCK) localStorage.setItem(CACHE_KEY, JSON.stringify(r)); } catch (e) {}
   elegirMes();
+  // En Carga de datos, en cuanto el mes de carga tiene datos, el selector de arriba lo muestra.
+  if (TAB === 'carga' && CARGA_MES && RESP.datos[CARGA_MES]) MES = CARGA_MES;
   render();
   setSync('Actualizado ' + horaCorta(r.generado), '');
 }
@@ -595,13 +597,42 @@ function vistaPuntaje() {
 
 // ============================================================================
 // VISTA: CARGA DE DATOS (solo admin)
+// Tiene su propio mes (CARGA_MES): por defecto el mes actual, aunque todavía no exista
+// en la planilla. El primer dato que se guarda crea el mes.
 // ============================================================================
+let CARGA_MES = null;
+
+function mesDeCarga() {
+  if (!CARGA_MES) {
+    const sel = MES ? mesInfo(MES) : null;
+    CARGA_MES = sel && !sel.historico ? MES : hoyISO().slice(0, 7);
+  }
+  return CARGA_MES;
+}
+
+function etiquetaDe(mes) {
+  const nombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const p = mes.split('-');
+  return nombres[Number(p[1]) - 1] + ' ' + p[0];
+}
+
 function vistaCarga() {
   const agentes = RESP.equipo.agentes;
-  const info = MES ? mesInfo(MES) : null;
-  const dm = MES ? RESP.datos[MES] : null;
-  const editable = info && !info.historico;
+  const mes = mesDeCarga();
+  const info = mesInfo(mes);
+  const dm = RESP.datos[mes] && RESP.datos[mes].agentes ? RESP.datos[mes] : null;
+  const etiqueta = etiquetaDe(mes);
+  const historico = !!(info && info.historico);
+  const porNombre = (n) => (dm ? dm.agentes.filter((a) => a.nombre === n)[0] : null);
+  const porExt = agentes.slice().sort((x, y) => x.ext.localeCompare(y.ext));
+  const porNom = agentes.slice().sort((x, y) => x.nombre.localeCompare(y.nombre));
   let h = '';
+
+  // ---- Mes de carga
+  h += '<div class="banner"><span class="grow"><b>Mes que estás cargando:</b> llamadas, campañas y días hábiles se guardan en este mes. ' +
+    (info ? (historico ? '<span class="c-amarillo">Es un mes histórico: no se edita.</span>' : (info.publicado ? 'Publicado: el equipo lo ve.' : 'Borrador: el equipo todavía no lo ve.'))
+      : 'Todavía no tiene datos: se crea con lo primero que guardes.') + '</span>' +
+    '<input class="inp" type="month" id="mesCarga" value="' + mes + '" style="width:auto" aria-label="Mes que estás cargando"></div>';
 
   // ---- Leads del día
   h += '<div class="grid2"><div class="card"><h3>Cargar leads del día</h3><div class="sub">Escribe directo en la pestaña <span class="mono">leads</span> de la planilla. Guardar el mismo día y agente pisa la fila anterior.</div>' +
@@ -620,50 +651,52 @@ function vistaCarga() {
     '<div class="acciones"><button class="btn pri" type="submit" id="lGuardar">Guardar y pasar al siguiente</button>' +
     '<button class="btn peligro" type="button" id="lBorrar" hidden>Borrar este día</button></div></form></div>';
 
-  // ---- Estado de carga del mes
-  h += '<div class="card"><h3>Mes ' + (info ? esc(info.etiqueta) : '') + '</h3><div class="sub">Días hábiles, publicación y control de carga.</div>';
-  if (editable) {
+  // ---- Estado del mes
+  h += '<div class="card"><h3>' + esc(etiqueta) + '</h3><div class="sub">Días hábiles, publicación y control de carga.</div>';
+  if (historico) {
+    h += '<p class="nota">Mes histórico (migrado de la versión vieja): no se edita. Elegí otro mes arriba para cargar.</p>';
+  } else {
     h += '<form class="form" id="fMes"><div class="f-row" style="grid-template-columns:1fr auto"><div class="fld"><label for="mDias">Días hábiles</label>' +
-      '<input class="inp" type="number" id="mDias" min="1" max="31" value="' + (info.diasHabiles || '') + '"></div>' +
+      '<input class="inp" type="number" id="mDias" min="1" max="31" value="' + ((info && info.diasHabiles) || '') + '"></div>' +
       '<div class="fld" style="align-self:end"><button class="btn" type="submit">Guardar</button></div></div></form>';
-    h += '<table class="t" style="margin-top:10px"><thead><tr><th>Agente</th><th class="r">Días cargados</th><th class="r">Faltan</th></tr></thead><tbody>' +
-      dm.agentes.slice().sort((x, y) => x.nombre.localeCompare(y.nombre)).map((a) => '<tr><td class="txt">' + esc(a.nombre) + '</td><td class="r">' + a.leads.dias.length + '</td>' +
-        '<td class="r ' + (a.ownership.faltanDias ? 'c-amarillo' : 'muted') + '">' + (a.ownership.faltanDias === null ? '—' : a.ownership.faltanDias) + '</td></tr>').join('') +
-      '</tbody></table>';
-    h += '<div class="acciones" style="margin-top:12px"><button class="btn ' + (info.publicado ? '' : 'pri') + '" data-accion="publicar" data-valor="' + (info.publicado ? '0' : '1') + '">' +
-      (info.publicado ? 'Despublicar' : 'Publicar ' + esc(info.etiqueta)) + '</button><span class="nota">' + (info.publicado ? 'El equipo lo ve.' : 'El equipo todavía no lo ve.') + '</span></div>';
-  } else if (info) {
-    h += '<p class="nota">Mes histórico: no se edita.</p>';
+    if (dm) {
+      h += '<table class="t" style="margin-top:10px"><thead><tr><th>Agente</th><th class="r">Días cargados</th><th class="r">Faltan</th></tr></thead><tbody>' +
+        dm.agentes.slice().sort((x, y) => x.nombre.localeCompare(y.nombre)).map((a) => '<tr><td class="txt">' + esc(a.nombre) + '</td><td class="r">' + a.leads.dias.length + '</td>' +
+          '<td class="r ' + (a.ownership.faltanDias ? 'c-amarillo' : 'muted') + '">' + (a.ownership.faltanDias === null ? '—' : a.ownership.faltanDias) + '</td></tr>').join('') +
+        '</tbody></table>';
+      h += '<div class="acciones" style="margin-top:12px"><button class="btn ' + (info.publicado ? '' : 'pri') + '" data-accion="publicar" data-mes="' + mes + '" data-valor="' + (info.publicado ? '0' : '1') + '">' +
+        (info.publicado ? 'Despublicar' : 'Publicar ' + esc(etiqueta)) + '</button><span class="nota">' + (info.publicado ? 'El equipo lo ve.' : 'El equipo todavía no lo ve.') + '</span></div>';
+    }
   }
-  h += '<form class="form" id="fNuevoMes" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"><div class="f-row" style="grid-template-columns:1fr 1fr auto">' +
-    '<div class="fld"><label for="nMes">Nuevo mes</label><input class="inp" type="month" id="nMes" required></div>' +
-    '<div class="fld"><label for="nDias">Días hábiles</label><input class="inp" type="number" id="nDias" min="1" max="31" required></div>' +
-    '<div class="fld" style="align-self:end"><button class="btn" type="submit">Crear</button></div></div></form></div></div>';
+  h += '</div></div>';
 
-  if (!editable) return h + avisosHtml();
+  if (historico) return h + avisosHtml();
 
   // ---- Llamadas
-  h += '<div class="h-sec">Llamadas · ' + esc(info.etiqueta) + '</div><div class="card"><div class="sub">El % atendidas y el TMO que puntúan salen del CSV de <b>entrantes</b>. El de salientes se guarda como dato informativo. ' +
-    'Elegí el archivo tal cual sale de 3CX (<span class="mono">agents_in_queue_statistics</span> o <span class="mono">outbound_calls</span>): se guarda solo en ' + esc(info.etiqueta) + '. La tabla de abajo muestra lo guardado y sirve para corregir a mano.</div>' +
-    '<div class="acciones" style="margin-bottom:10px"><span class="btn file">Importar CSV entrantes<input type="file" accept=".csv,text/csv" id="csvIn"></span>' +
+  h += '<div class="h-sec">Llamadas · ' + esc(etiqueta) + '</div><div class="card"><div class="sub">Elegí el archivo tal cual lo bajás de 3CX: se guarda solo en <b>' + esc(etiqueta) + '</b>. ' +
+    'Entrantes (<span class="mono">agents_in_queue_statistics</span>) da el % atendidas y el TMO que puntúan; salientes (<span class="mono">outbound_calls</span>) es informativo.</div>' +
+    '<div class="acciones" style="margin-bottom:10px"><span class="btn pri file">Importar CSV entrantes<input type="file" accept=".csv,text/csv" id="csvIn"></span>' +
     '<span class="btn file">Importar CSV salientes<input type="file" accept=".csv,text/csv" id="csvOut"></span><span class="nota" id="csvMsg">' + esc(MSG_LLAMADAS) + '</span></div>' +
     '<div class="scroll"><table class="t tbl-inp"><thead><tr><th>Agente</th><th>% Atendidas</th><th>TMO (m:ss)</th><th>Llamadas</th><th>TMO salientes</th><th>Salientes</th></tr></thead><tbody>' +
-    dm.agentes.slice().sort((x, y) => x.ext.localeCompare(y.ext)).map((a) => {
-      const C = a.llamadas;
-      return '<tr data-ag="' + esc(a.nombre) + '"><td class="txt">' + a.ext + ' ' + esc(a.nombre) + '</td>' +
-        '<td><input class="inp sm" name="pct" inputmode="decimal" value="' + (C.pct ?? '') + '"></td>' +
-        '<td><input class="inp sm" name="tmo" value="' + (C.tmo === null ? '' : C.tmoTxt) + '"></td>' +
-        '<td><input class="inp sm" name="llamadas" inputmode="numeric" value="' + (C.atendidas ?? '') + '"></td>' +
-        '<td><input class="inp sm" name="tmoSal" value="' + (C.tmoSalientes === null ? '' : C.tmoSalientesTxt) + '"></td>' +
-        '<td><input class="inp sm" name="salientes" inputmode="numeric" value="' + (C.salientes ?? '') + '"></td></tr>';
+    porExt.map((ag) => {
+      const a = porNombre(ag.nombre), C = a ? a.llamadas : null;
+      const v = (x) => (x === null || x === undefined ? '' : x);
+      return '<tr data-ag="' + esc(ag.nombre) + '"><td class="txt">' + ag.ext + ' ' + esc(ag.nombre) + '</td>' +
+        '<td><input class="inp sm" name="pct" inputmode="decimal" value="' + v(C && C.pct) + '"></td>' +
+        '<td><input class="inp sm" name="tmo" value="' + (C && C.tmo !== null ? C.tmoTxt : '') + '"></td>' +
+        '<td><input class="inp sm" name="llamadas" inputmode="numeric" value="' + v(C && C.atendidas) + '"></td>' +
+        '<td><input class="inp sm" name="tmoSal" value="' + (C && C.tmoSalientes !== null ? C.tmoSalientesTxt : '') + '"></td>' +
+        '<td><input class="inp sm" name="salientes" inputmode="numeric" value="' + v(C && C.salientes) + '"></td></tr>';
     }).join('') + '</tbody></table></div>' +
-    '<div class="acciones" style="margin-top:10px"><button class="btn" id="btnLlamadas">Guardar correcciones</button></div></div>';
+    '<div class="acciones" style="margin-top:10px"><button class="btn" id="btnLlamadas">Guardar correcciones</button><span class="nota">Solo si cambiaste algún valor a mano.</span></div></div>';
 
   // ---- Campañas
-  h += '<div class="h-sec">Campañas ganadas · ' + esc(info.etiqueta) + '</div><div class="card"><form id="fCamp"><div class="f-row" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">' +
-    dm.agentes.slice().sort((x, y) => x.nombre.localeCompare(y.nombre)).map((a) => a.campanas.recepcion
-      ? '<div class="fld"><label>' + esc(a.nombre) + '</label><div class="prev">Recepción · 15 fijos</div></div>'
-      : '<div class="fld"><label for="c_' + a.ext + '">' + esc(a.nombre) + '</label><input class="inp" type="number" min="0" step="1" inputmode="numeric" id="c_' + a.ext + '" data-ag="' + esc(a.nombre) + '" value="' + (a.campanas.cargado ? a.campanas.ganadas : '') + '"></div>').join('') +
+  h += '<div class="h-sec">Campañas ganadas · ' + esc(etiqueta) + '</div><div class="card"><form id="fCamp"><div class="f-row" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">' +
+    porNom.map((ag) => {
+      if (!ag.campanas) return '<div class="fld"><label>' + esc(ag.nombre) + '</label><div class="prev">Recepción · 15 fijos</div></div>';
+      const a = porNombre(ag.nombre);
+      return '<div class="fld"><label for="c_' + ag.ext + '">' + esc(ag.nombre) + '</label><input class="inp" type="number" min="0" step="1" inputmode="numeric" id="c_' + ag.ext + '" data-ag="' + esc(ag.nombre) + '" value="' + (a && a.campanas.cargado ? a.campanas.ganadas : '') + '"></div>';
+    }).join('') +
     '</div><div class="acciones" style="margin-top:10px"><button class="btn pri" type="submit">Guardar campañas</button></div></form></div>';
 
   return h + avisosHtml();
@@ -691,13 +724,15 @@ function prepararCarga() {
     FORM.agente = $('lAgente').value;
     precargarLead();
   }
-  const fm = $('fMes');
-  if (fm) fm.addEventListener('submit', (ev) => { ev.preventDefault(); guardar(fm.querySelector('button'), 'guardarMes', { mes: MES, diasHabiles: $('mDias').value }, 'Días hábiles guardados'); });
-  $('fNuevoMes').addEventListener('submit', async (ev) => {
-    ev.preventDefault();
-    const mes = $('nMes').value;
-    if (await guardar(ev.target.querySelector('button'), 'guardarMes', { mes: mes, diasHabiles: $('nDias').value }, 'Mes creado')) { MES = mes; render(); }
+  $('mesCarga').addEventListener('change', (ev) => {
+    if (!/^\d{4}-\d{2}$/.test(ev.target.value)) return;
+    CARGA_MES = ev.target.value;
+    MSG_LLAMADAS = '';
+    if (RESP.datos[CARGA_MES]) MES = CARGA_MES;
+    render();
   });
+  const fm = $('fMes');
+  if (fm) fm.addEventListener('submit', (ev) => { ev.preventDefault(); guardar(fm.querySelector('button'), 'guardarMes', { mes: mesDeCarga(), diasHabiles: $('mDias').value }, 'Días hábiles guardados'); });
   const csvIn = $('csvIn'), csvOut = $('csvOut');
   if (csvIn) csvIn.addEventListener('change', (ev) => importarCsv(ev, 'entrantes'));
   if (csvOut) csvOut.addEventListener('change', (ev) => importarCsv(ev, 'salientes'));
@@ -708,7 +743,7 @@ function prepararCarga() {
     ev.preventDefault();
     const valores = {};
     fc.querySelectorAll('input[data-ag]').forEach((i) => { if (i.value !== '') valores[i.dataset.ag] = Number(i.value); });
-    guardar(fc.querySelector('button'), 'guardarCampanas', { mes: MES, valores: valores }, 'Campañas guardadas');
+    guardar(fc.querySelector('button'), 'guardarCampanas', { mes: mesDeCarga(), valores: valores }, 'Campañas guardadas');
   });
 }
 
@@ -790,11 +825,12 @@ async function guardar(btn, accion, datos, ok) {
   }
 }
 
-async function publicar(valor) {
-  const info = mesInfo(MES);
+async function publicar(valor, mesPub) {
+  const mes = mesPub || MES;
+  const info = mesInfo(mes);
   const pub = valor === '1';
   if (!confirm(pub ? 'Publicar ' + info.etiqueta + ': el equipo lo va a ver y pasa a ser el mes que se muestra al entrar. ¿Confirmás?' : '¿Despublicar ' + info.etiqueta + '? El equipo deja de verlo.')) return;
-  await guardar(null, 'guardarMes', { mes: MES, publicado: pub }, pub ? 'Publicado: ya lo ve el equipo' : 'Despublicado');
+  await guardar(null, 'guardarMes', { mes: mes, publicado: pub }, pub ? 'Publicado: ya lo ve el equipo' : 'Despublicado');
 }
 
 // ============================================================================
@@ -820,7 +856,7 @@ function importarCsv(ev, tipo) {
     $('csvMsg').textContent = 'Importando ' + file.name + '…';
     document.querySelectorAll('.file').forEach((b) => b.setAttribute('disabled', ''));
     try {
-      const datos = { mes: MES, tipo: tipo, texto: lector.result };
+      const datos = { mes: mesDeCarga(), tipo: tipo, texto: lector.result };
       let r = await apiPost('importarLlamadas', datos);
       if (r.confirmar) {
         if (!confirm(r.confirmar)) { $('csvMsg').textContent = 'Cancelado: no se guardó nada.'; return; }
@@ -861,8 +897,8 @@ async function guardarLlamadas() {
   const btn = $('btnLlamadas');
   btn.disabled = true;
   try {
-    if (ent.length) await apiPost('guardarLlamadas', { mes: MES, tipo: 'entrantes', filas: ent });
-    if (sal.length) await apiPost('guardarLlamadas', { mes: MES, tipo: 'salientes', filas: sal });
+    if (ent.length) await apiPost('guardarLlamadas', { mes: mesDeCarga(), tipo: 'entrantes', filas: ent });
+    if (sal.length) await apiPost('guardarLlamadas', { mes: mesDeCarga(), tipo: 'salientes', filas: sal });
     await refrescar();
     toast('Llamadas guardadas en la planilla');
   } catch (e) { toast('No se guardó: ' + e.message, true); btn.disabled = false; }
@@ -902,14 +938,19 @@ async function exportarPng() {
 // ============================================================================
 // EVENTOS
 // ============================================================================
-$('selMes').addEventListener('change', (ev) => { MES = ev.target.value; render(); });
+$('selMes').addEventListener('change', (ev) => {
+  MES = ev.target.value;
+  const info = mesInfo(MES);
+  if (info && !info.historico) { CARGA_MES = MES; MSG_LLAMADAS = ''; }
+  render();
+});
 $('btnPng').addEventListener('click', exportarPng);
 $('tabs').addEventListener('click', (ev) => { const b = ev.target.closest('[data-tab]'); if (b) { TAB = b.dataset.tab; render(); window.scrollTo(0, 0); } });
 $('main').addEventListener('click', (ev) => {
   const f = ev.target.closest('[data-ficha]');
   if (f) { abrirFicha(f.dataset.ficha); return; }
   const p = ev.target.closest('[data-accion="publicar"]');
-  if (p) publicar(p.dataset.valor);
+  if (p) publicar(p.dataset.valor, p.dataset.mes);
 });
 $('capaModal').addEventListener('click', (ev) => { if (ev.target.dataset && ev.target.dataset.cerrar) cerrarFicha(); });
 document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') cerrarFicha(); });
