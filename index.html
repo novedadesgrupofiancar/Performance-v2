@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Performance Contact Center — Grupo Fiancar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+// ============================================================================
+// 🔗 URL DEL APPS SCRIPT — pegá acá la URL de la implementación (termina en /exec)
+//    Ver docs/INSTALACION.md, paso 4.
+// ============================================================================
+const API_URL = 'URL: https://script.google.com/macros/s/AKfycbyNYlThcQgB0ocNMQcmqg0v7uU90uLQuC49AXry3oVyXjvi7Evq8wjog3l0CrrrPjva/exec';
+</script>
+<style>
+:root {
+  --bg: #0a0a0f; --s1: #13131a; --s2: #1c1c26; --border: #252535; --border2: #30304a;
+  --text: #eeeef5; --text2: #9e9eba; --muted: #6b6b86; --accent: #7c5cfc; --accent-soft: rgba(124, 92, 252, .14);
+  --green: #22d47a; --yellow: #f5c842; --red: #ff3a5c;
+  --font: 'Space Grotesk', system-ui, sans-serif; --mono: 'DM Mono', ui-monospace, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.4; min-height: 100vh; }
+button, input, select { font: inherit; color: inherit; }
+.mono { font-family: var(--mono); }
+.muted { color: var(--muted); } .t2 { color: var(--text2); }
+.c-verde { color: var(--green); } .c-amarillo { color: var(--yellow); } .c-rojo { color: var(--red); }
+.bg-verde { background: var(--green); } .bg-amarillo { background: var(--yellow); } .bg-rojo { background: var(--red); }
+[hidden] { display: none !important; }
+
+/* ---------- Header */
+.top { position: sticky; top: 0; z-index: 20; background: var(--s1); border-bottom: 1px solid var(--border); }
+.top-in { max-width: 1280px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; flex-direction: column; margin-right: auto; min-width: 0; }
+.brand b { font-size: 15px; font-weight: 600; letter-spacing: .2px; }
+.brand span { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); }
+.sel { background: var(--s2); border: 1px solid var(--border2); padding: 7px 10px; font-family: var(--mono); font-size: 12px; outline: none; border-radius: 0; }
+.sel:focus { border-color: var(--accent); }
+.chip { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; padding: 5px 8px; border: 1px solid var(--border2); color: var(--text2); white-space: nowrap; }
+.chip.admin { color: var(--accent); border-color: rgba(124, 92, 252, .45); background: var(--accent-soft); }
+.chip.warn { color: var(--yellow); border-color: rgba(245, 200, 66, .4); }
+.chip.err { color: var(--red); border-color: rgba(255, 58, 92, .4); }
+.btn { background: var(--s2); border: 1px solid var(--border2); padding: 7px 12px; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); }
+.btn.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.pri:hover { opacity: .9; }
+.btn.peligro { color: var(--red); border-color: rgba(255, 58, 92, .35); }
+.btn:disabled { opacity: .5; cursor: wait; }
+.tabs { max-width: 1280px; margin: 0 auto; padding: 0 16px; display: flex; gap: 2px; overflow-x: auto; }
+.tab { background: none; border: none; border-bottom: 2px solid transparent; padding: 9px 12px; font-size: 13px; color: var(--text2); cursor: pointer; white-space: nowrap; }
+.tab.on { color: var(--text); border-bottom-color: var(--accent); }
+
+main { max-width: 1280px; margin: 0 auto; padding: 16px; }
+.banner { border: 1px solid var(--border2); background: var(--s1); padding: 10px 12px; margin-bottom: 14px; font-size: 13px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.banner.warn { border-color: rgba(245, 200, 66, .4); }
+.banner.err { border-color: rgba(255, 58, 92, .45); }
+.banner .grow { flex: 1; min-width: 200px; }
+.h-sec { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text2); margin: 18px 0 10px; display: flex; align-items: center; gap: 10px; }
+.h-sec::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ---------- Tiles */
+.tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.tile { background: var(--s1); border: 1px solid var(--border); padding: 12px; min-width: 0; }
+.tile .l { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); }
+.tile .v { font-size: 26px; font-weight: 700; line-height: 1.1; margin-top: 4px; font-family: var(--mono); }
+.tile .s { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.semas { display: flex; gap: 10px; margin-top: 6px; font-family: var(--mono); font-size: 20px; font-weight: 600; }
+.semas span::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; background: currentColor; }
+
+/* ---------- Ranking */
+.rk { background: var(--s1); border: 1px solid var(--border); }
+.rk-row { display: grid; grid-template-columns: 44px minmax(170px, 1.5fr) repeat(5, minmax(84px, 1fr)) 96px; align-items: stretch; border-bottom: 1px solid var(--border); }
+.rk-row:last-child { border-bottom: none; }
+.rk-row.body { cursor: pointer; }
+.rk-row.body:hover { background: var(--s2); }
+.rk-row > div { padding: 10px 8px; min-width: 0; }
+.rk-head > div { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); padding-top: 9px; padding-bottom: 9px; }
+.rk-head .max { color: var(--muted); }
+.pos { font-family: var(--mono); font-size: 18px; font-weight: 500; color: var(--text2); text-align: center; align-self: center; }
+.pos.p1 { color: var(--accent); }
+.ag b { display: block; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag span { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmp .n { font-family: var(--mono); font-size: 15px; font-weight: 500; }
+.cmp .n small { color: var(--muted); font-size: 10px; }
+.cmp .m { font-family: var(--mono); font-size: 10.5px; color: var(--text2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar { height: 3px; background: var(--s2); margin-top: 5px; position: relative; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); }
+.cmp .lbl { display: none; }
+.tot { text-align: right; align-self: center; }
+.tot .v { font-family: var(--mono); font-size: 22px; font-weight: 600; }
+.tot .sem { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.sindatos { color: var(--muted); }
+.alerta { color: var(--yellow); cursor: help; }
+
+/* ---------- Cards genéricas */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.card { background: var(--s1); border: 1px solid var(--border); padding: 14px; min-width: 0; }
+.card h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+.card .sub { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 13px; }
+.kv .k { color: var(--text2); }
+.kv .v { font-family: var(--mono); text-align: right; }
+table.t { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.t th { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); font-weight: 400; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+table.t td { padding: 6px 8px; border-bottom: 1px solid var(--border); font-family: var(--mono); }
+table.t td.txt { font-family: var(--font); }
+table.t .r { text-align: right; }
+.scroll { overflow-x: auto; }
+
+/* ---------- Ficha (modal) */
+.ov { position: fixed; inset: 0; background: rgba(5, 5, 10, .78); z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 32px 16px; overflow-y: auto; }
+.modal { background: var(--s1); border: 1px solid var(--border2); width: 100%; max-width: 860px; }
+.modal-h { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border-bottom: 1px solid var(--border); }
+.modal-h .grow { flex: 1; min-width: 0; }
+.modal-h h2 { font-size: 20px; font-weight: 600; }
+.modal-b { padding: 16px; }
+.big { font-family: var(--mono); font-size: 40px; font-weight: 600; line-height: 1; text-align: right; }
+.x { background: none; border: 1px solid var(--border2); width: 32px; height: 32px; cursor: pointer; font-size: 16px; color: var(--text2); flex: none; }
+.desg { display: grid; gap: 10px; }
+.desg-row { display: grid; grid-template-columns: 150px 1fr 70px; gap: 12px; align-items: center; }
+.desg-row .nm { font-size: 13px; }
+.desg-row .nm small { display: block; color: var(--muted); font-size: 11px; font-family: var(--mono); }
+.desg-row .bar { height: 8px; margin: 0; }
+.desg-row .pt { font-family: var(--mono); text-align: right; font-size: 15px; }
+.desg-row .pt small { color: var(--muted); font-size: 11px; }
+.tmo-ch { display: grid; gap: 6px; }
+.tmo-r { display: grid; grid-template-columns: 120px 1fr 48px; gap: 10px; align-items: center; font-size: 12px; }
+.tmo-r.yo { color: var(--text); font-weight: 600; }
+.tmo-r:not(.yo) { color: var(--text2); }
+.tmo-tr { position: relative; height: 14px; background: var(--s2); }
+.tmo-tr i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--border2); }
+.tmo-r.yo .tmo-tr i { background: var(--accent); }
+.tmo-mk { position: absolute; top: -3px; bottom: -3px; width: 2px; }
+.tmo-ley { font-family: var(--mono); font-size: 10.5px; color: var(--text2); display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
+.tmo-ley span::before { content: ''; display: inline-block; width: 10px; height: 2px; margin-right: 5px; vertical-align: middle; background: var(--c); }
+
+/* ---------- Formularios (admin) */
+.form { display: grid; gap: 10px; }
+.f-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.fld label { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); margin-bottom: 4px; }
+.inp { width: 100%; background: var(--s2); border: 1px solid var(--border2); padding: 8px 10px; font-family: var(--mono); font-size: 14px; outline: none; border-radius: 0; }
+.inp:focus { border-color: var(--accent); }
+.inp.sm { padding: 5px 7px; font-size: 13px; }
+.seg { display: flex; }
+.seg button { flex: 1; background: var(--s2); border: 1px solid var(--border2); padding: 8px; font-family: var(--mono); font-size: 13px; cursor: pointer; }
+.seg button + button { border-left: none; }
+.seg button.on.si { background: rgba(34, 212, 122, .15); border-color: var(--green); color: var(--green); }
+.seg button.on.no { background: rgba(255, 58, 92, .12); border-color: var(--red); color: var(--red); }
+.errs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 12px; color: var(--text2); margin-top: 6px; }
+.errs label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.nota { font-size: 12px; color: var(--text2); }
+.prev { font-family: var(--mono); font-size: 12px; padding: 8px 10px; background: var(--s2); border: 1px solid var(--border); }
+.acciones { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.file { position: relative; overflow: hidden; display: inline-block; }
+.file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.avisos li { font-size: 12px; font-family: var(--mono); color: var(--yellow); margin-left: 16px; padding: 2px 0; }
+.tbl-inp td { padding: 4px 6px; }
+.tbl-inp .inp { min-width: 70px; }
+
+/* ---------- Toast y carga */
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--s2); border: 1px solid var(--border2); padding: 10px 16px; font-size: 13px; z-index: 80; max-width: calc(100% - 32px); }
+.toast.err { border-color: var(--red); color: var(--red); }
+.vacio { padding: 40px 16px; text-align: center; color: var(--text2); }
+.vacio b { display: block; color: var(--text); font-size: 16px; margin-bottom: 6px; }
+.pie { max-width: 1280px; margin: 0 auto; padding: 8px 16px 32px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+/* ---------- Celular */
+@media (max-width: 900px) {
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .tiles .tile:first-child { grid-column: span 2; }
+  .grid2 { grid-template-columns: 1fr; }
+  .rk-head { display: none !important; }
+  .rk-row { grid-template-columns: 34px 1fr auto; grid-template-areas: 'pos ag tot' 'c c c'; padding: 4px 4px 8px; }
+  .rk-row > .pos { grid-area: pos; }
+  .rk-row > .ag { grid-area: ag; }
+  .rk-row > .tot { grid-area: tot; }
+  .rk-row > .cmps { grid-area: c; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 0 4px; }
+  .cmp { padding: 6px 4px !important; background: var(--s2); }
+  .cmp .lbl { display: block; font-family: var(--mono); font-size: 9px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
+  .cmp .n { font-size: 14px; }
+  .cmp .m { font-size: 9.5px; }
+  .desg-row { grid-template-columns: 1fr 60px; }
+  .desg-row .bar { grid-column: span 2; order: 3; }
+  .tmo-r { grid-template-columns: 84px 1fr 42px; }
+  .f-row { grid-template-columns: 1fr 1fr; }
+  .ov { padding: 0; }
+  .modal { min-height: 100vh; border: none; }
+}
+@media (min-width: 901px) { .cmps { display: contents; } }
+@media (max-width: 420px) { .f-row { grid-template-columns: 1fr; } .errs { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><span>Grupo Fiancar</span><b>Performance Contact Center</b></div>
+    <select class="sel" id="selMes" aria-label="Mes" hidden></select>
+    <span class="chip" id="chipSync">Cargando…</span>
+    <span class="chip admin" id="chipRol" hidden>Admin</span>
+    <button class="btn" id="btnPng" hidden>Exportar PNG</button>
+  </div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+
+<main id="main"><div class="vacio">Cargando datos…</div></main>
+<div class="pie" id="pie"></div>
+<div id="capaModal"></div>
+<div id="capaToast"></div>
+
+<script>
+'use strict';
+// ============================================================================
+// MODO: lo define la URL. ?admin=CLAVE -> el backend valida la clave.
+// La clave NO se guarda en este archivo (se sube a GitHub Pages y es público).
+// ============================================================================
+const Q = new URLSearchParams(location.search);
+const ADMIN_KEY = Q.get('admin') || '';
+const ES_LOCAL = ['localhost', '127.0.0.1'].indexOf(location.hostname) >= 0;
+const MODO_MOCK = ES_LOCAL && Q.get('api') === 'mock';   // solo pruebas locales
+const CACHE_KEY = 'perf_fiancar_cache_v1_' + (ADMIN_KEY ? 'admin' : 'equipo');
+
+let RESP = null;
+let MES = Q.get('mes') || null;
+let TAB = 'ranking';
+let MOCK = null;
+const FORM = { fecha: hoyISO(), agente: null, tarea: true, llamadas: null, salientes: null };
+
+const MAX = { leads: 30, pct: 25, own: 20, camp: 15, tmo: 10 };
+const $ = (id) => document.getElementById(id);
+
+// ============================================================================
+// API
+// ============================================================================
+function backendConfigurado() { return MODO_MOCK || /^https:\/\/script\.google(usercontent)?\.com\//.test(API_URL); }
+
+async function apiGet() {
+  if (MODO_MOCK) return MOCK.get(ADMIN_KEY);
+  const url = API_URL + '?t=' + Date.now() + (ADMIN_KEY ? '&admin=' + encodeURIComponent(ADMIN_KEY) : '');
+  const r = await fetch(url, { redirect: 'follow' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+async function apiPost(accion, datos) {
+  let res;
+  if (MODO_MOCK) res = MOCK.post(ADMIN_KEY, accion, datos);
+  else {
+    // text/plain evita el preflight CORS que Apps Script no soporta.
+    const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ token: ADMIN_KEY, accion: accion, datos: datos }) });
+    res = await r.json();
+  }
+  if (!res.ok) throw new Error(res.error || 'Error desconocido');
+  return res;
+}
+
+async function cargarMock() {
+  const carga = (src) => new Promise((ok, mal) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = mal; document.head.appendChild(s); });
+  await carga('pruebas/mock-gas.js');
+  await carga('pruebas/datos-demo.js');
+  const codigo = await (await fetch('backend/Codigo.gs?t=' + Date.now())).text();
+  MOCK = window.crearBackendDemo(codigo, Q.get('vacio') === '1');
+}
+
+// ============================================================================
+// ARRANQUE
+// ============================================================================
+async function iniciar() {
+  if (!backendConfigurado()) {
+    $('chipSync').textContent = 'Sin backend';
+    $('chipSync').className = 'chip err';
+    $('main').innerHTML = '<div class="vacio"><b>Falta conectar la planilla</b>Pegá la URL del Apps Script en la constante <span class="mono">API_URL</span> al principio de <span class="mono">index.html</span>.<br>Paso a paso en <span class="mono">docs/INSTALACION.md</span>.</div>';
+    return;
+  }
+  // Caché de lectura: pinta al instante lo último que se vio, mientras llega el backend.
+  try {
+    const c = localStorage.getItem(CACHE_KEY);
+    if (c && !MODO_MOCK) { RESP = JSON.parse(c); elegirMes(); render(); setSync('Copia guardada · actualizando…', 'warn'); }
+  } catch (e) {}
+  try {
+    if (MODO_MOCK) await cargarMock();
+    await refrescar();
+  } catch (e) {
+    console.error(e);
+    if (RESP) setSync('Sin conexión · mostrando copia guardada', 'err');
+    else {
+      setSync('Sin conexión', 'err');
+      $('main').innerHTML = '<div class="vacio"><b>No se pudo leer la planilla</b>' + esc(e.message) + '<br>Revisá la conexión o la URL del Apps Script.</div>';
+    }
+  }
+}
+
+async function refrescar() {
+  const r = await apiGet();
+  if (!r.ok) throw new Error(r.error || 'Respuesta inválida del backend');
+  RESP = r;
+  try { if (!MODO_MOCK) localStorage.setItem(CACHE_KEY, JSON.stringify(r)); } catch (e) {}
+  elegirMes();
+  render();
+  setSync('Actualizado ' + horaCorta(r.generado), '');
+}
+
+function elegirMes() {
+  if (!RESP) return;
+  if (!MES || !RESP.datos[MES]) MES = RESP.mesMostrado || (RESP.meses[0] && RESP.meses[0].mes) || null;
+}
+
+function esAdmin() { return !!(RESP && RESP.esAdmin); }
+
+// ============================================================================
+// RENDER GENERAL
+// ============================================================================
+function render() {
+  const admin = esAdmin();
+  $('chipRol').hidden = !admin;
+  $('btnPng').hidden = !admin || !MES;
+  // Selector de mes
+  const sel = $('selMes');
+  sel.hidden = !RESP.meses.length;
+  sel.innerHTML = RESP.meses.map((m) => '<option value="' + m.mes + '"' + (m.mes === MES ? ' selected' : '') + '>' +
+    esc(m.etiqueta) + (m.historico ? ' · histórico' : (admin && !m.publicado ? ' · borrador' : '')) + '</option>').join('');
+  // Pestañas
+  const tabs = [['ranking', 'Ranking'], ['especiales', 'Evaluación especial'], ['puntaje', 'Cómo se calcula']];
+  if (admin) tabs.push(['carga', 'Carga de datos']);
+  if (!tabs.some((t) => t[0] === TAB)) TAB = 'ranking';
+  $('tabs').innerHTML = tabs.map((t) => '<button class="tab' + (t[0] === TAB ? ' on' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>').join('');
+
+  let html = bannerAdmin();
+  if (!MES && TAB !== 'puntaje' && TAB !== 'carga') {
+    html += '<div class="vacio"><b>Todavía no hay meses publicados</b>Cuando el coordinador publique el mes, lo vas a ver acá.</div>';
+  } else if (TAB === 'ranking') html += vistaRanking();
+  else if (TAB === 'especiales') html += vistaEspeciales();
+  else if (TAB === 'puntaje') html += vistaPuntaje();
+  else if (TAB === 'carga') html += vistaCarga();
+  $('main').innerHTML = html;
+  if (TAB === 'carga') prepararCarga();
+  if (TAB === 'especiales' && admin) prepararEspeciales();
+  $('pie').textContent = 'Datos: planilla de Google · ' + (admin ? 'modo admin' : 'modo equipo (solo lectura)') + (MODO_MOCK ? ' · BACKEND DE PRUEBA' : '');
+}
+
+function bannerAdmin() {
+  let h = '';
+  if (ADMIN_KEY && RESP && !RESP.esAdmin) {
+    h += '<div class="banner err"><span class="grow"><b>La clave de admin no es válida.</b> ' + esc(RESP.adminError || '') + ' Estás viendo el modo equipo.</span></div>';
+  }
+  if (MODO_MOCK) h += '<div class="banner warn"><span class="grow">Backend de prueba en memoria (pruebas locales). Nada de esto se guarda en la planilla real.</span></div>';
+  return h;
+}
+
+function mesInfo(mes) { return (RESP.meses || []).filter((m) => m.mes === mes)[0] || null; }
+
+// ============================================================================
+// VISTA: RANKING
+// ============================================================================
+function vistaRanking() {
+  const info = mesInfo(MES), dm = RESP.datos[MES];
+  if (!dm) return '';
+  if (info.historico) return vistaHistorico(info, dm.historico);
+  const admin = esAdmin();
+  let h = '<div id="vistaMes">';
+  // Barra de estado del mes
+  h += '<div class="banner no-png' + (info.publicado ? '' : ' warn') + '"><span class="grow"><b>' + esc(info.etiqueta) + '</b> · ';
+  if (admin) h += info.publicado ? 'Publicado: el equipo lo ve.' : 'Borrador: el equipo todavía no lo ve.';
+  else h += 'Resultados del mes.';
+  if (dm.diasHabiles) h += ' <span class="muted mono">' + dm.diasHabiles + ' días hábiles</span>';
+  h += '</span>';
+  if (admin) h += '<button class="btn ' + (info.publicado ? '' : 'pri') + '" data-accion="publicar" data-valor="' + (info.publicado ? '0' : '1') + '">' +
+    (info.publicado ? 'Despublicar' : 'Publicar ' + esc(info.etiqueta)) + '</button>';
+  h += '</div>';
+
+  // Tiles
+  const eq = dm.equipo;
+  h += '<div class="tiles">' +
+    tile('Promedio del equipo', eq.total === null ? '—' : fmt(eq.total), '/ 100 · 6 agentes', eq.total === null ? '' : 'c-' + semaforoDe(eq.total)) +
+    '<div class="tile"><div class="l">Semáforo</div><div class="semas"><span class="c-verde">' + eq.verdes + '</span><span class="c-amarillo">' + eq.amarillos + '</span><span class="c-rojo">' + eq.rojos + '</span></div><div class="s">≥80 · 66–79 · &lt;66</div></div>' +
+    tile('% Atendidas', eq.pct === null ? '—' : fmt(eq.pct) + '%', 'objetivo 90%') +
+    tile('TMO equipo', eq.tmoTxt, 'objetivo 2:45') +
+    tile('Campañas', String(eq.campanas), 'ganadas en el mes') +
+    '</div>';
+
+  // Ranking
+  h += '<div class="h-sec">Ranking</div><div class="rk">';
+  h += '<div class="rk-row rk-head"><div>#</div><div>Agente</div>' +
+    ['Leads|30', '% Atend.|25', 'Ownership|20', 'Campañas|15', 'TMO|10'].map((x) => { const p = x.split('|'); return '<div>' + p[0] + ' <span class="max">/' + p[1] + '</span></div>'; }).join('') +
+    '<div style="text-align:right">Total</div></div>';
+  dm.agentes.forEach((a) => { h += filaRanking(a); });
+  h += '</div>';
+  h += '<p class="nota" style="margin-top:8px">Tocá un agente para ver su ficha. <span class="alerta">⚠</span> = TMO menor a 1:30 (solo alerta, no resta puntos).</p>';
+  h += '</div>';
+  return h;
+}
+
+function tile(l, v, s, cls) {
+  return '<div class="tile"><div class="l">' + l + '</div><div class="v ' + (cls || '') + '">' + v + '</div><div class="s">' + s + '</div></div>';
+}
+
+function cmp(lbl, pts, max, metrica, sinDatos) {
+  return '<div class="cmp"><span class="lbl">' + lbl + '</span><div class="n' + (sinDatos ? ' sindatos' : '') + '">' + fmt(pts) + '</div>' +
+    '<div class="m">' + metrica + '</div><div class="bar"><i style="width:' + Math.max(0, Math.min(100, pts / max * 100)) + '%"></i></div></div>';
+}
+
+function filaRanking(a) {
+  const L = a.leads, O = a.ownership, C = a.llamadas, K = a.campanas;
+  const mLeads = L.sinDatos ? 'sin datos' : fmt(L.promedio, 2) + '/10 · ' + L.diasConDatos + 'd';
+  const mPct = C.pct === null ? 'sin datos' : fmt(C.pct) + '%';
+  const mOwn = O.sinDatos ? 'sin datos' : O.diasAlDia + '/' + O.diasCargados + ' días';
+  const mCamp = K.recepcion ? 'Recepción' : K.ganadas + ' gan. · ' + K.puesto + '°';
+  const mTmo = C.tmo === null ? 'sin datos' : C.tmoTxt + (C.alertaTmo ? ' <span class="alerta" title="TMO menor a 1:30">⚠</span>' : '');
+  return '<div class="rk-row body" data-ficha="' + esc(a.nombre) + '">' +
+    '<div class="pos' + (a.puesto === 1 ? ' p1' : '') + '">' + a.puesto + '</div>' +
+    '<div class="ag"><b>' + esc(a.nombre) + '</b><span>' + a.ext + ' · ' + esc(a.tarea) + '</span></div>' +
+    '<div class="cmps">' +
+    cmp('Leads', L.pts, MAX.leads, mLeads, L.sinDatos) +
+    cmp('% Atend', C.ptsPct, MAX.pct, mPct, C.pct === null) +
+    cmp('Owner', O.pts, MAX.own, mOwn, O.sinDatos) +
+    cmp('Camp.', K.pts, MAX.camp, mCamp, false) +
+    cmp('TMO', C.ptsTmo, MAX.tmo, mTmo, C.tmo === null) +
+    '</div>' +
+    '<div class="tot"><span class="sem bg-' + a.semaforo + '"></span><span class="v c-' + a.semaforo + '">' + fmt(a.total) + '</span></div>' +
+    '</div>';
+}
+
+// ============================================================================
+// VISTA: MES HISTÓRICO (migrado, no se recalcula)
+// ============================================================================
+function vistaHistorico(info, hist) {
+  let h = '<div id="vistaMes"><div class="banner warn"><span class="grow"><b>' + esc(info.etiqueta) + ' · Histórico.</b> ' +
+    'Datos migrados de la versión anterior. Se muestran tal cual se comunicaron: solo leads, con la fórmula y la escala vieja (leads /25). No se comparan con los meses nuevos.</span></div>';
+  h += '<div class="rk scroll"><table class="t"><thead><tr><th>Agente</th><th class="r">Días</th><th class="r">Promedio /10</th><th class="r">Leads /25</th></tr></thead><tbody>';
+  hist.agentes.forEach((a) => {
+    h += '<tr><td class="txt">' + esc(a.nombre) + (a.activo ? '' : ' <span class="chip" style="margin-left:6px">ex equipo</span>') + '</td>' +
+      '<td class="r">' + a.diasConDatos + '</td><td class="r">' + fmt(a.promedio, 2) + '</td><td class="r"><b>' + fmt(a.ptsViejo) + '</b></td></tr>';
+  });
+  h += '</tbody></table></div></div>';
+  return h;
+}
+
+// ============================================================================
+// FICHA INDIVIDUAL
+// ============================================================================
+function abrirFicha(nombre) {
+  const dm = RESP.datos[MES];
+  const a = dm.agentes.filter((x) => x.nombre === nombre)[0];
+  if (!a) return;
+  const L = a.leads, O = a.ownership, C = a.llamadas, K = a.campanas;
+  let h = '<div class="ov" data-cerrar="1"><div class="modal" role="dialog" aria-label="Ficha de ' + esc(a.nombre) + '">';
+  h += '<div class="modal-h"><div class="grow"><h2>' + esc(a.nombre) + '</h2><div class="t2" style="font-size:12px">' + a.ext + ' · ' + esc(a.tarea) + ' · ' + esc(mesInfo(MES).etiqueta) + '</div>' +
+    '<div class="mono muted" style="font-size:11px;margin-top:4px">Puesto ' + a.puesto + ' de ' + dm.agentes.length + '</div></div>' +
+    '<div><div class="big c-' + a.semaforo + '">' + fmt(a.total) + '</div><div class="mono muted" style="font-size:10px;text-align:right">/ 100</div></div>' +
+    '<button class="x" data-cerrar="1" aria-label="Cerrar">✕</button></div>';
+  h += '<div class="modal-b">';
+
+  // Desglose
+  h += '<div class="h-sec" style="margin-top:0">Desglose del puntaje</div><div class="desg">';
+  h += desg('Leads', L.sinDatos ? 'sin datos' : 'promedio ' + fmt(L.promedio, 2) + '/10 × 3', L.pts, MAX.leads);
+  h += desg('% Llamadas atendidas', C.pct === null ? 'sin datos' : fmt(C.pct) + '% · objetivo 90%', C.ptsPct, MAX.pct);
+  h += desg('Tarea asignada', O.sinDatos ? 'sin datos' : O.diasAlDia + ' de ' + O.diasCargados + ' días al día (' + fmt(O.pct) + '%)', O.pts, MAX.own);
+  h += desg('Campañas', K.recepcion ? 'Recepción · puntos fijos' : K.ganadas + ' ganadas · ' + K.puesto + '° del equipo', K.pts, MAX.camp);
+  h += desg('TMO', C.tmo === null ? 'sin datos' : C.tmoTxt + ' · objetivo 2:45', C.ptsTmo, MAX.tmo);
+  h += '</div>';
+
+  // Métricas
+  h += '<div class="grid2" style="margin-top:16px">';
+  h += '<div class="card"><h3>Llamadas</h3><div class="sub">Del sistema de telefonía</div><div class="kv">' +
+    '<span class="k">% atendidas (entrantes)</span><span class="v">' + (C.pct === null ? '—' : fmt(C.pct) + '%') + '</span>' +
+    '<span class="k">Llamadas atendidas</span><span class="v">' + (C.atendidas || '—') + '</span>' +
+    '<span class="k">TMO entrantes</span><span class="v">' + C.tmoTxt + (C.alertaTmo ? ' <span class="alerta">⚠</span>' : '') + '</span>' +
+    '<span class="k">TMO salientes</span><span class="v">' + C.tmoSalientesTxt + '</span>' +
+    '<span class="k">Llamadas salientes</span><span class="v">' + (C.salientes || '—') + '</span></div>' +
+    (C.alertaTmo ? '<p class="nota" style="margin-top:10px"><span class="alerta">⚠</span> TMO menor a 1:30: revisar que no se esté despachando rápido al cliente. No resta puntos.</p>' : '') + '</div>';
+  h += '<div class="card"><h3>TMO contra el equipo</h3><div class="sub">Tiempo medio de llamadas entrantes</div>' + graficoTmo(a, dm) + '</div>';
+  h += '</div>';
+
+  // Leads por día
+  h += '<div class="h-sec">Leads día por día</div>';
+  if (!L.dias.length) h += '<p class="nota">Sin días cargados en el mes.</p>';
+  else {
+    h += '<div class="scroll"><table class="t"><thead><tr><th>Fecha</th><th class="r">Totales</th><th class="r">Sin gest.</th><th class="r">Errores</th><th class="r">Tarea</th><th class="r">Puntaje</th></tr></thead><tbody>';
+    L.dias.forEach((d) => {
+      const col = d.score === null ? 'muted' : d.score >= 8 ? 'c-verde' : d.score >= 6.6 ? 'c-amarillo' : 'c-rojo';
+      h += '<tr><td>' + fechaCorta(d.fecha) + '</td><td class="r">' + d.totales + '</td><td class="r">' + d.sinGestionar + '</td><td class="r">' + d.errores + '</td>' +
+        '<td class="r ' + (d.tarea === true ? 'c-verde' : d.tarea === false ? 'c-rojo' : 'muted') + '">' + (d.tarea === true ? 'SI' : d.tarea === false ? 'NO' : '—') + '</td>' +
+        '<td class="r ' + col + '">' + (d.score === null ? 'no cuenta' : fmt(d.score, 2)) + '</td></tr>';
+    });
+    h += '</tbody></table></div><p class="nota" style="margin-top:6px">Puntaje del día = 10 × gestionados / totales − 0,5 × errores del peor lead. Los días sin leads no cuentan.</p>';
+  }
+  h += '</div></div></div>';
+  $('capaModal').innerHTML = h;
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarFicha() { $('capaModal').innerHTML = ''; document.body.style.overflow = ''; }
+
+function desg(nombre, detalle, pts, max) {
+  return '<div class="desg-row"><div class="nm">' + nombre + '<small>' + detalle + '</small></div>' +
+    '<div class="bar"><i style="width:' + Math.min(100, pts / max * 100) + '%"></i></div>' +
+    '<div class="pt">' + fmt(pts) + '<small>/' + max + '</small></div></div>';
+}
+
+function graficoTmo(a, dm) {
+  const lista = dm.agentes.filter((x) => x.llamadas.tmo !== null).slice().sort((x, y) => x.llamadas.tmo - y.llamadas.tmo);
+  if (!lista.length || a.llamadas.tmo === null) return '<p class="nota">Sin datos de TMO este mes.</p>';
+  const tope = Math.max(240, Math.max.apply(null, lista.map((x) => x.llamadas.tmo)) + 15);
+  const pos = (s) => (s / tope * 100) + '%';
+  let h = '<div class="tmo-ch">';
+  lista.forEach((x) => {
+    h += '<div class="tmo-r' + (x.nombre === a.nombre ? ' yo' : '') + '"><span>' + esc(x.nombre.split(' ')[0]) + (x.llamadas.alertaTmo ? ' <span class="alerta">⚠</span>' : '') + '</span>' +
+      '<div class="tmo-tr"><i style="width:' + pos(x.llamadas.tmo) + '"></i>' +
+      '<span class="tmo-mk" style="left:' + pos(165) + ';background:var(--green)"></span>' +
+      (dm.equipo.tmo ? '<span class="tmo-mk" style="left:' + pos(dm.equipo.tmo) + ';background:var(--yellow)"></span>' : '') +
+      '</div><span class="mono" style="text-align:right">' + x.llamadas.tmoTxt + '</span></div>';
+  });
+  h += '</div><div class="tmo-ley"><span style="--c:var(--green)">objetivo 2:45</span><span style="--c:var(--yellow)">promedio equipo ' + dm.equipo.tmoTxt + '</span></div>';
+  const dif = a.llamadas.tmo - dm.equipo.tmo;
+  h += '<p class="nota" style="margin-top:8px">' + (dif === 0 ? 'Igual al promedio del equipo.' : segTxt(Math.abs(dif)) + (dif > 0 ? ' por encima' : ' por debajo') + ' del promedio del equipo.') + '</p>';
+  return h;
+}
+
+// ============================================================================
+// VISTA: EVALUACIÓN ESPECIAL
+// ============================================================================
+function vistaEspeciales() {
+  const info = mesInfo(MES), dm = RESP.datos[MES];
+  if (info.historico) return '<div class="vacio"><b>' + esc(info.etiqueta) + ' es un mes histórico</b>La evaluación especial empieza con los meses nuevos.</div>';
+  const admin = esAdmin();
+  let h = '<div id="vistaMes"><div class="banner"><span class="grow"><b>Evaluación especial · ' + esc(info.etiqueta) + '.</b> Piero y Shoanna tienen su propia rúbrica: no entran al ranking ni a los promedios del equipo.</span></div><div class="grid2">';
+  dm.especiales.forEach((s) => {
+    h += '<div class="card"><div style="display:flex;justify-content:space-between;gap:10px"><div><h3>' + esc(s.nombre) + '</h3><div class="sub">' + s.ext + ' · ' + esc(s.tarea) + '</div></div>' +
+      '<div><div class="big ' + (s.semaforo ? 'c-' + s.semaforo : 'muted') + '" style="font-size:32px">' + (s.sinDatos ? '—' : s.total) + '</div><div class="mono muted" style="font-size:10px;text-align:right">/ 100</div></div></div>';
+    if (s.sinDatos) h += '<p class="nota">Sin datos cargados para este mes.</p>';
+    else {
+      h += '<div class="desg">' +
+        desg('Encuestas', s.encuestas === null ? 'sin dato' : fmt(s.encuestas) + '% de satisfacción', s.ptsEncuestas, 50) +
+        desg('Tareas / redes / wpp', s.estado || 'sin dato', s.ptsEstado, 20) +
+        desg('Actitud', s.actitud || 'sin dato', s.ptsActitud, 30) + '</div>' +
+        '<div class="kv" style="margin-top:12px"><span class="k">% Post Ventas (informativo, no suma)</span><span class="v">' + (s.postVentas === null ? '—' : fmt(s.postVentas) + '%') + '</span></div>';
+    }
+    if (admin) h += formEspecial(s);
+    h += '</div>';
+  });
+  h += '</div></div>';
+  return h;
+}
+
+function formEspecial(s) {
+  const id = s.nombre.split(' ')[0].toLowerCase();
+  const opts = (lista, val) => '<option value="">—</option>' + lista.map((o) => '<option' + (o === val ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
+  return '<form class="form" data-especial="' + esc(s.nombre) + '" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">' +
+    '<div class="f-row" style="grid-template-columns:1fr 1fr">' +
+    '<div class="fld"><label for="enc_' + id + '">% Encuestas</label><input class="inp" id="enc_' + id + '" name="encuestas" type="number" step="0.1" min="0" max="100" inputmode="decimal" value="' + (s.encuestas ?? '') + '"></div>' +
+    '<div class="fld"><label for="pv_' + id + '">% Post Ventas</label><input class="inp" id="pv_' + id + '" name="postVentas" type="number" step="0.1" min="0" max="100" inputmode="decimal" value="' + (s.postVentas ?? '') + '"></div></div>' +
+    '<div class="fld"><label for="est_' + id + '">Estado tareas / redes / wpp</label><select class="inp" id="est_' + id + '" name="estado">' + opts(RESP.equipo.estados, s.estado) + '</select></div>' +
+    '<div class="fld"><label for="act_' + id + '">Actitud</label><select class="inp" id="act_' + id + '" name="actitud">' + opts(RESP.equipo.actitudes, s.actitud) + '</select></div>' +
+    '<div class="acciones"><button class="btn pri" type="submit">Guardar ' + esc(s.nombre.split(' ')[0]) + '</button></div></form>';
+}
+
+function prepararEspeciales() {
+  document.querySelectorAll('form[data-especial]').forEach((f) => {
+    f.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const v = (n) => f.elements[n].value;
+      guardar(f.querySelector('button[type=submit]'), 'guardarEspecial', {
+        mes: MES, agente: f.dataset.especial, encuestas: v('encuestas'), postVentas: v('postVentas'), estado: v('estado'), actitud: v('actitud')
+      }, 'Guardado: ' + f.dataset.especial);
+    });
+  });
+}
+
+// ============================================================================
+// VISTA: CÓMO SE CALCULA (estático, para el equipo)
+// ============================================================================
+function vistaPuntaje() {
+  const tabla = (titulo, filas) => '<div class="card"><h3>' + titulo + '</h3><table class="t" style="margin-top:8px"><tbody>' +
+    filas.map((f) => '<tr><td class="txt">' + f[0] + '</td><td class="r"><b>' + f[1] + '</b></td></tr>').join('') + '</tbody></table></div>';
+  return '<div class="banner"><span class="grow">Puntaje total sobre 100: <b class="mono">Leads 30 · % Atendidas 25 · Tarea asignada 20 · Campañas 15 · TMO 10</b>. Semáforo: <span class="c-verde">≥ 80</span> · <span class="c-amarillo">66–79</span> · <span class="c-rojo">&lt; 66</span>.</span></div>' +
+    '<div class="grid2">' +
+    '<div class="card"><h3>Leads (30)</h3><p class="nota" style="margin-top:6px">Cada día se puntúa de 0 a 10:<br><span class="mono">10 × gestionados ÷ leads del día − 0,5 × errores</span><br>' +
+    '“Errores” son los del peor lead mal gestionado del día (0 a 8), se cuentan una sola vez por día. Los días sin leads no cuentan. ' +
+    'El puntaje del mes es el promedio simple de los días × 3: cada día pesa igual, porque se mide la constancia.</p>' +
+    '<p class="nota" style="margin-top:8px">Errores posibles: ' + (RESP ? RESP.equipo.erroresLead.map(esc).join(' · ') : '') + '.</p></div>' +
+    tabla('% Llamadas atendidas (25) · objetivo 90%', [['≥ 90%', 25], ['85 – 89,9%', 21], ['80 – 84,9%', 17], ['75 – 79,9%', 13], ['70 – 74,9%', 9], ['60 – 69,9%', 5], ['&lt; 60%', 0]]) +
+    tabla('Tarea asignada (20) · días al día ÷ días cargados', [['100%', 20], ['90 – 99%', 18], ['80 – 89%', 15], ['70 – 79%', 12], ['60 – 69%', 8], ['&lt; 60%', 4]]) +
+    tabla('Campañas ganadas (15)', [['10 o más', 15], ['7 – 9', 12], ['5 – 6', 9], ['3 – 4', 6], ['1 – 2', 3], ['0', 0], ['Natasha (recepción)', 15]]) +
+    tabla('TMO (10) · objetivo 2:45', [['≤ 2:45', 10], ['2:46 – 3:00', 8], ['3:01 – 3:15', 6], ['3:16 – 3:30', 4], ['&gt; 3:30', 2]]) +
+    '<div class="card"><h3>Evaluación especial (Piero y Shoanna)</h3><p class="nota" style="margin-top:6px">Encuestas (50): ≥90% 50 · 85–89 32 · 80–84 24 · 70–79 12 · &lt;70 0.<br>' +
+    'Tareas/redes/wpp (20): siempre al día 20 · 1–2 desbordes leves 15 · atrasos recurrentes 8 · desorden constante 0.<br>' +
+    'Actitud (30): ejemplar 30 · buena 15 · correcta pero pasiva 8 · mala 0.<br>% Post Ventas es informativo. No entran al ranking.</p>' +
+    '<p class="nota" style="margin-top:8px">El TMO pesa poco a propósito: es higiene, no rendimiento. Un TMO menor a 1:30 se marca con <span class="alerta">⚠</span> pero no resta.</p></div>' +
+    '</div>';
+}
+
+// ============================================================================
+// VISTA: CARGA DE DATOS (solo admin)
+// ============================================================================
+function vistaCarga() {
+  const agentes = RESP.equipo.agentes;
+  const info = MES ? mesInfo(MES) : null;
+  const dm = MES ? RESP.datos[MES] : null;
+  const editable = info && !info.historico;
+  let h = '';
+
+  // ---- Leads del día
+  h += '<div class="grid2"><div class="card"><h3>Cargar leads del día</h3><div class="sub">Escribe directo en la pestaña <span class="mono">leads</span> de la planilla. Guardar el mismo día y agente pisa la fila anterior.</div>' +
+    '<form class="form" id="fLead" autocomplete="off">' +
+    '<div class="f-row" style="grid-template-columns:1fr 1.4fr">' +
+    '<div class="fld"><label for="lFecha">Fecha</label><input class="inp" type="date" id="lFecha" required value="' + FORM.fecha + '"></div>' +
+    '<div class="fld"><label for="lAgente">Agente</label><select class="inp" id="lAgente">' + agentes.map((a) => '<option' + (a.nombre === FORM.agente ? ' selected' : '') + '>' + esc(a.nombre) + '</option>').join('') + '</select></div></div>' +
+    '<div class="f-row">' +
+    '<div class="fld"><label for="lTot">Leads totales</label><input class="inp" type="number" id="lTot" min="0" step="1" inputmode="numeric" required></div>' +
+    '<div class="fld"><label for="lSin">Sin gestionar</label><input class="inp" type="number" id="lSin" min="0" step="1" inputmode="numeric" value="0"></div>' +
+    '<div class="fld"><label for="lErr">Errores (0-8)</label><input class="inp" type="number" id="lErr" min="0" max="8" step="1" inputmode="numeric" value="0"></div></div>' +
+    '<details><summary class="nota" style="cursor:pointer">Contar errores del peor lead con tildes</summary><div class="errs">' +
+    RESP.equipo.erroresLead.map((e, i) => '<label><input type="checkbox" class="lChk" data-i="' + i + '"> ' + esc(e) + '</label>').join('') + '</div></details>' +
+    '<div class="fld"><label>Tarea asignada al día</label><div class="seg" id="lTarea"><button type="button" class="si" data-v="1">SI</button><button type="button" class="no" data-v="0">NO</button></div></div>' +
+    '<div class="prev" id="lPrev">—</div>' +
+    '<div class="acciones"><button class="btn pri" type="submit" id="lGuardar">Guardar y pasar al siguiente</button>' +
+    '<button class="btn peligro" type="button" id="lBorrar" hidden>Borrar este día</button></div></form></div>';
+
+  // ---- Estado de carga del mes
+  h += '<div class="card"><h3>Mes ' + (info ? esc(info.etiqueta) : '') + '</h3><div class="sub">Días hábiles, publicación y control de carga.</div>';
+  if (editable) {
+    h += '<form class="form" id="fMes"><div class="f-row" style="grid-template-columns:1fr auto"><div class="fld"><label for="mDias">Días hábiles</label>' +
+      '<input class="inp" type="number" id="mDias" min="1" max="31" value="' + (info.diasHabiles || '') + '"></div>' +
+      '<div class="fld" style="align-self:end"><button class="btn" type="submit">Guardar</button></div></div></form>';
+    h += '<table class="t" style="margin-top:10px"><thead><tr><th>Agente</th><th class="r">Días cargados</th><th class="r">Faltan</th></tr></thead><tbody>' +
+      dm.agentes.slice().sort((x, y) => x.nombre.localeCompare(y.nombre)).map((a) => '<tr><td class="txt">' + esc(a.nombre) + '</td><td class="r">' + a.leads.dias.length + '</td>' +
+        '<td class="r ' + (a.ownership.faltanDias ? 'c-amarillo' : 'muted') + '">' + (a.ownership.faltanDias === null ? '—' : a.ownership.faltanDias) + '</td></tr>').join('') +
+      '</tbody></table>';
+    h += '<div class="acciones" style="margin-top:12px"><button class="btn ' + (info.publicado ? '' : 'pri') + '" data-accion="publicar" data-valor="' + (info.publicado ? '0' : '1') + '">' +
+      (info.publicado ? 'Despublicar' : 'Publicar ' + esc(info.etiqueta)) + '</button><span class="nota">' + (info.publicado ? 'El equipo lo ve.' : 'El equipo todavía no lo ve.') + '</span></div>';
+  } else if (info) {
+    h += '<p class="nota">Mes histórico: no se edita.</p>';
+  }
+  h += '<form class="form" id="fNuevoMes" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"><div class="f-row" style="grid-template-columns:1fr 1fr auto">' +
+    '<div class="fld"><label for="nMes">Nuevo mes</label><input class="inp" type="month" id="nMes" required></div>' +
+    '<div class="fld"><label for="nDias">Días hábiles</label><input class="inp" type="number" id="nDias" min="1" max="31" required></div>' +
+    '<div class="fld" style="align-self:end"><button class="btn" type="submit">Crear</button></div></div></form></div></div>';
+
+  if (!editable) return h + avisosHtml();
+
+  // ---- Llamadas
+  h += '<div class="h-sec">Llamadas · ' + esc(info.etiqueta) + '</div><div class="card"><div class="sub">El % atendidas y el TMO que puntúan salen del CSV de <b>entrantes</b>. El de salientes se guarda como dato informativo. ' +
+    'Columnas esperadas: <span class="mono">Agent, % Calls Serviced, Talk Time Mean</span> (el agente se reconoce por la extensión).</div>' +
+    '<div class="acciones" style="margin-bottom:10px"><span class="btn file">Importar CSV entrantes<input type="file" accept=".csv,text/csv" id="csvIn"></span>' +
+    '<span class="btn file">Importar CSV salientes<input type="file" accept=".csv,text/csv" id="csvOut"></span><span class="nota" id="csvMsg"></span></div>' +
+    '<div class="scroll"><table class="t tbl-inp"><thead><tr><th>Agente</th><th>% Atendidas</th><th>TMO (m:ss)</th><th>Llamadas</th><th>TMO salientes</th><th>Salientes</th></tr></thead><tbody>' +
+    dm.agentes.slice().sort((x, y) => x.ext.localeCompare(y.ext)).map((a) => {
+      const C = a.llamadas;
+      return '<tr data-ag="' + esc(a.nombre) + '"><td class="txt">' + a.ext + ' ' + esc(a.nombre) + '</td>' +
+        '<td><input class="inp sm" name="pct" inputmode="decimal" value="' + (C.pct ?? '') + '"></td>' +
+        '<td><input class="inp sm" name="tmo" value="' + (C.tmo === null ? '' : C.tmoTxt) + '"></td>' +
+        '<td><input class="inp sm" name="llamadas" inputmode="numeric" value="' + (C.atendidas ?? '') + '"></td>' +
+        '<td><input class="inp sm" name="tmoSal" value="' + (C.tmoSalientes === null ? '' : C.tmoSalientesTxt) + '"></td>' +
+        '<td><input class="inp sm" name="salientes" inputmode="numeric" value="' + (C.salientes ?? '') + '"></td></tr>';
+    }).join('') + '</tbody></table></div>' +
+    '<div class="acciones" style="margin-top:10px"><button class="btn pri" id="btnLlamadas">Guardar llamadas</button></div></div>';
+
+  // ---- Campañas
+  h += '<div class="h-sec">Campañas ganadas · ' + esc(info.etiqueta) + '</div><div class="card"><form id="fCamp"><div class="f-row" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">' +
+    dm.agentes.slice().sort((x, y) => x.nombre.localeCompare(y.nombre)).map((a) => a.campanas.recepcion
+      ? '<div class="fld"><label>' + esc(a.nombre) + '</label><div class="prev">Recepción · 15 fijos</div></div>'
+      : '<div class="fld"><label for="c_' + a.ext + '">' + esc(a.nombre) + '</label><input class="inp" type="number" min="0" step="1" inputmode="numeric" id="c_' + a.ext + '" data-ag="' + esc(a.nombre) + '" value="' + (a.campanas.cargado ? a.campanas.ganadas : '') + '"></div>').join('') +
+    '</div><div class="acciones" style="margin-top:10px"><button class="btn pri" type="submit">Guardar campañas</button></div></form></div>';
+
+  return h + avisosHtml();
+}
+
+function avisosHtml() {
+  const av = RESP.avisos || [];
+  return '<div class="h-sec">Avisos de la planilla</div><div class="card">' +
+    (av.length ? '<ul class="avisos">' + av.map((a) => '<li>' + esc(a) + '</li>').join('') + '</ul>' : '<p class="nota">Sin avisos: todas las filas se leyeron bien.</p>') + '</div>';
+}
+
+function prepararCarga() {
+  const f = $('fLead');
+  if (f) {
+    const actualizar = () => { FORM.fecha = $('lFecha').value; FORM.agente = $('lAgente').value; precargarLead(); };
+    $('lFecha').addEventListener('change', actualizar);
+    $('lAgente').addEventListener('change', actualizar);
+    ['lTot', 'lSin', 'lErr'].forEach((id) => $(id).addEventListener('input', previewLead));
+    document.querySelectorAll('.lChk').forEach((c) => c.addEventListener('change', () => {
+      $('lErr').value = document.querySelectorAll('.lChk:checked').length; previewLead();
+    }));
+    $('lTarea').addEventListener('click', (ev) => { const b = ev.target.closest('button'); if (b) { FORM.tarea = b.dataset.v === '1'; pintarTarea(); } });
+    f.addEventListener('submit', (ev) => { ev.preventDefault(); guardarLead(); });
+    $('lBorrar').addEventListener('click', borrarLead);
+    FORM.agente = $('lAgente').value;
+    precargarLead();
+  }
+  const fm = $('fMes');
+  if (fm) fm.addEventListener('submit', (ev) => { ev.preventDefault(); guardar(fm.querySelector('button'), 'guardarMes', { mes: MES, diasHabiles: $('mDias').value }, 'Días hábiles guardados'); });
+  $('fNuevoMes').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const mes = $('nMes').value;
+    if (await guardar(ev.target.querySelector('button'), 'guardarMes', { mes: mes, diasHabiles: $('nDias').value }, 'Mes creado')) { MES = mes; render(); }
+  });
+  const csvIn = $('csvIn'), csvOut = $('csvOut');
+  if (csvIn) csvIn.addEventListener('change', (ev) => importarCsv(ev, 'entrantes'));
+  if (csvOut) csvOut.addEventListener('change', (ev) => importarCsv(ev, 'salientes'));
+  const bl = $('btnLlamadas');
+  if (bl) bl.addEventListener('click', guardarLlamadas);
+  const fc = $('fCamp');
+  if (fc) fc.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const valores = {};
+    fc.querySelectorAll('input[data-ag]').forEach((i) => { if (i.value !== '') valores[i.dataset.ag] = Number(i.value); });
+    guardar(fc.querySelector('button'), 'guardarCampanas', { mes: MES, valores: valores }, 'Campañas guardadas');
+  });
+}
+
+function leadExistente(fecha, agente) {
+  const dm = RESP.datos[(fecha || '').slice(0, 7)];
+  if (!dm || !dm.agentes) return null;
+  const a = dm.agentes.filter((x) => x.nombre === agente)[0];
+  return a ? a.leads.dias.filter((d) => d.fecha === fecha)[0] || null : null;
+}
+
+function precargarLead() {
+  const d = leadExistente(FORM.fecha, FORM.agente);
+  $('lTot').value = d ? d.totales : '';
+  $('lSin').value = d ? d.sinGestionar : 0;
+  $('lErr').value = d ? d.errores : 0;
+  FORM.tarea = d ? d.tarea !== false : true;
+  document.querySelectorAll('.lChk').forEach((c) => { c.checked = false; });
+  $('lBorrar').hidden = !d;
+  pintarTarea();
+  previewLead(d);
+}
+
+function pintarTarea() {
+  $('lTarea').querySelectorAll('button').forEach((b) => b.classList.toggle('on', (b.dataset.v === '1') === FORM.tarea));
+}
+
+function previewLead(existente) {
+  const tot = $('lTot').value, sin = Number($('lSin').value || 0), err = Number($('lErr').value || 0);
+  const prev = $('lPrev');
+  const d = existente && existente.fecha ? existente : leadExistente(FORM.fecha, FORM.agente);
+  let msg = d ? 'Ya cargado: ' + d.totales + ' leads, ' + d.sinGestionar + ' sin gestionar, ' + d.errores + ' errores, tarea ' + (d.tarea ? 'SI' : 'NO') + ' → ' + (d.score === null ? 'no cuenta' : fmt(d.score, 2) + '/10') + '. Guardar lo reemplaza.' : 'Día nuevo para este agente.';
+  if (tot !== '' && Number(tot) >= 0) {
+    const gest = Number(tot) - sin;
+    if (sin > Number(tot)) msg += '  ⚠ Sin gestionar no puede ser mayor que los totales.';
+    else if (err > 8 || err < 0) msg += '  ⚠ Errores va de 0 a 8.';
+    else msg += '  Gestionados: ' + gest + '.';
+  }
+  prev.textContent = msg;
+}
+
+async function guardarLead() {
+  const tot = $('lTot').value;
+  if (tot === '') { toast('Falta "Leads totales"', true); return; }
+  const datos = { fecha: $('lFecha').value, agente: $('lAgente').value, totales: Number(tot), sinGestionar: Number($('lSin').value || 0), errores: Number($('lErr').value || 0), tareaAlDia: FORM.tarea };
+  if (datos.sinGestionar > datos.totales) { toast('Sin gestionar no puede ser mayor que los totales', true); return; }
+  if (datos.errores < 0 || datos.errores > 8) { toast('Errores va de 0 a 8', true); return; }
+  const btn = $('lGuardar');
+  btn.disabled = true;
+  try {
+    const r = await apiPost('guardarLead', datos);
+    // Pasar al siguiente agente, misma fecha
+    const nombres = RESP.equipo.agentes.map((a) => a.nombre);
+    FORM.agente = nombres[(nombres.indexOf(datos.agente) + 1) % nombres.length];
+    const mesLead = datos.fecha.slice(0, 7);
+    if (MES !== mesLead) MES = mesLead;
+    await refrescar();
+    toast('Guardado ' + datos.agente.split(' ')[0] + ' · ' + fechaCorta(datos.fecha) + ' → ' + (r.scoreDia === null ? 'día sin leads (no cuenta)' : fmt(r.scoreDia, 2) + '/10'));
+    setTimeout(() => { const t = $('lTot'); if (t) t.focus(); }, 0);
+  } catch (e) { toast('No se guardó: ' + e.message, true); btn.disabled = false; }
+}
+
+async function borrarLead() {
+  if (!confirm('¿Borrar el ' + fechaCorta(FORM.fecha) + ' de ' + FORM.agente + ' de la planilla?')) return;
+  await guardar($('lBorrar'), 'borrarLead', { fecha: FORM.fecha, agente: FORM.agente }, 'Día borrado');
+}
+
+/** POST genérico + refresco. Devuelve true si salió bien. */
+async function guardar(btn, accion, datos, ok) {
+  if (btn) btn.disabled = true;
+  try {
+    await apiPost(accion, datos);
+    await refrescar();
+    toast(ok);
+    return true;
+  } catch (e) {
+    toast('No se guardó: ' + e.message, true);
+    if (btn) btn.disabled = false;
+    return false;
+  }
+}
+
+async function publicar(valor) {
+  const info = mesInfo(MES);
+  const pub = valor === '1';
+  if (!confirm(pub ? 'Publicar ' + info.etiqueta + ': el equipo lo va a ver y pasa a ser el mes que se muestra al entrar. ¿Confirmás?' : '¿Despublicar ' + info.etiqueta + '? El equipo deja de verlo.')) return;
+  await guardar(null, 'guardarMes', { mes: MES, publicado: pub }, pub ? 'Publicado: ya lo ve el equipo' : 'Despublicado');
+}
+
+// ============================================================================
+// CSV DE LLAMADAS
+// Acepta los dos formatos de la central:
+//  - Resumen por agente y cola ("% de llamadas atendidas por agente"):
+//      Queue, Agent, Calls Answered, % Calls Serviced, Talk Time Total, Talk Time Mean...
+//  - Registro llamada por llamada (outbound_calls):
+//      Call Time, Caller ID, Caller Display name, Status, Talking...
+// ============================================================================
+
+/** Parte un CSV completo respetando comillas (incluso saltos de línea dentro de comillas). */
+function leerCsv(texto) {
+  if (texto.charCodeAt(0) === 0xFEFF) texto = texto.slice(1);
+  const fin = texto.indexOf('\n');
+  const primera = fin < 0 ? texto : texto.slice(0, fin);
+  const sep = primera.split(';').length > primera.split(',').length ? ';' : ',';
+  const filas = [];
+  let fila = [], cur = '', q = false;
+  for (let i = 0; i < texto.length; i++) {
+    const ch = texto[i];
+    if (q) {
+      if (ch === '"' && texto[i + 1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') q = false;
+      else cur += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === sep) { fila.push(cur.trim()); cur = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && texto[i + 1] === '\n') i++;
+      fila.push(cur.trim()); cur = '';
+      if (fila.some((c) => c !== '')) filas.push(fila);
+      fila = [];
+    } else cur += ch;
+  }
+  fila.push(cur.trim());
+  if (fila.some((c) => c !== '')) filas.push(fila);
+  return filas;
+}
+
+function numeroCsv(s) { if (s == null || s === '') return null; const n = Number(String(s).replace('%', '').replace(',', '.').trim()); return isNaN(n) ? null : n; }
+function segundosCsv(s) {
+  if (!s) return null;
+  const p = String(s).trim().split(':').map(Number);
+  if (p.some(isNaN)) return numeroCsv(s);
+  return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p.length === 2 ? p[0] * 60 + p[1] : p[0];
+}
+
+/**
+ * Reconoce al agente por la extensión, pero exige que el nombre también se parezca.
+ * Así "7997 Isabel Crosa" NO se le asigna a Gianine aunque tengan la misma extensión.
+ * Devuelve { nombre } o { motivo }.
+ */
+function matchAgente(txt, agentes) {
+  const s = String(txt || '');
+  const ext = (s.match(/^\s*(\d{3,5})\b/) || s.match(/\((\d{3,5})\)\s*$/) || [])[1];
+  const nombreCsv = sinTildes(s.replace(/\(\d+\)/g, '').replace(/^\s*\d+\s*/, ''));
+  const tokens = nombreCsv.split(/\s+/).filter((t) => t.length >= 3);
+  const parecido = (oficial) => sinTildes(oficial).split(/\s+/).some((o) => tokens.some((t) => o.slice(0, 4) === t.slice(0, 4)));
+  if (ext) {
+    const a = agentes.filter((x) => x.ext === ext)[0];
+    if (!a) return { motivo: 'no está en el ranking' };
+    if (!tokens.length || parecido(a.nombre)) return { nombre: a.nombre };
+    return { motivo: 'la extensión ' + ext + ' es de ' + a.nombre + ' pero el nombre no coincide' };
+  }
+  const a = agentes.filter((x) => sinTildes(x.nombre) === nombreCsv)[0];
+  return a ? { nombre: a.nombre } : { motivo: 'no está en el ranking' };
+}
+
+/**
+ * Resume un CSV de llamadas por agente.
+ * tipo 'entrantes': % atendidas = Σ atendidas ÷ Σ ofrecidas (ofrecidas de cada cola = atendidas ÷ %),
+ *                   TMO = Σ tiempo hablado ÷ Σ atendidas. Las colas sin atendidas no pesan.
+ * tipo 'salientes': cantidad de llamadas contestadas y TMO de las contestadas.
+ * Devuelve { formato, porAgente: {nombre: {pct, tmo, llamadas}}, ignorados: [{texto, motivo, filas}], meses: [] }
+ */
+function resumirCsvLlamadas(texto, tipo, agentes) {
+  const filas = leerCsv(texto);
+  if (filas.length < 2) throw new Error('El CSV está vacío.');
+  const enc = filas[0].map((h) => h.trim().toLowerCase());
+  const col = (fn) => enc.findIndex(fn);
+  const ignorados = {}, acc = {}, meses = {};
+  const ignorar = (txt, motivo) => { const k = txt + '|' + motivo; (ignorados[k] = ignorados[k] || { texto: txt, motivo: motivo, filas: 0 }).filas++; };
+  const esCentral = (t) => !t || /call center|^totals?$/i.test(t.replace(/^\s*\d+\s*/, ''));
+
+  const iCaller = col((h) => h === 'caller id'), iStatus = col((h) => h === 'status'), iTalking = col((h) => h === 'talking');
+  if (iCaller >= 0 && iStatus >= 0 && iTalking >= 0) {
+    // ---- Registro llamada por llamada
+    if (tipo === 'entrantes') throw new Error('Este archivo es un registro llamada por llamada (salientes). Para entrantes usá el reporte "% de llamadas atendidas por agente".');
+    const iNom = col((h) => h === 'caller display name'), iFecha = col((h) => h === 'call time');
+    filas.slice(1).forEach((c) => {
+      if (/^totals?$/i.test(c[0])) return;
+      const id = c[iCaller] || '';
+      const txt = iNom >= 0 && c[iNom] ? c[iNom].replace(/\(\d+\)\s*$/, '').trim() : '';
+      if (iFecha >= 0 && /^\d{4}-\d{2}/.test(c[iFecha])) meses[c[iFecha].slice(0, 7)] = true;
+      const m = matchAgente(id + ' ' + txt, agentes);
+      if (!m.nombre) { ignorar((id + ' ' + txt).trim(), m.motivo); return; }
+      const a = acc[m.nombre] = acc[m.nombre] || { contestadas: 0, hablado: 0, intentos: 0 };
+      a.intentos++;
+      if (sinTildes(c[iStatus]) === 'answered') { a.contestadas++; a.hablado += segundosCsv(c[iTalking]) || 0; }
+    });
+    const porAgente = {};
+    Object.keys(acc).forEach((n) => {
+      const a = acc[n];
+      porAgente[n] = { pct: null, tmo: a.contestadas ? Math.round(a.hablado / a.contestadas) : null, llamadas: a.contestadas, intentos: a.intentos };
+    });
+    return { formato: 'registro', porAgente: porAgente, ignorados: Object.values(ignorados), meses: Object.keys(meses).sort() };
+  }
+
+  // ---- Resumen por agente (y por cola)
+  const iAg = col((h) => h === 'agent' || h === 'agente');
+  const iPct = col((h) => h.indexOf('serviced') >= 0);
+  const iCant = col((h) => h === 'calls answered' || h === 'calls');
+  const iTot = col((h) => h === 'talk time total');
+  const iMed = col((h) => h === 'talk time mean');
+  if (iAg < 0 || (iMed < 0 && iTot < 0)) throw new Error('No reconozco el formato: faltan las columnas "Agent" y "Talk Time Mean".');
+  if (tipo === 'entrantes' && iPct < 0) throw new Error('Este CSV no trae "% Calls Serviced". ¿Es el de entrantes?');
+  filas.slice(1).forEach((c) => {
+    const txt = c[iAg] || '';
+    if (esCentral(txt)) return;
+    const m = matchAgente(txt, agentes);
+    if (!m.nombre) { ignorar(txt, m.motivo); return; }
+    const a = acc[m.nombre] = acc[m.nombre] || { atendidas: 0, ofrecidas: 0, hablado: 0, pctSimple: [], tmoSimple: [] };
+    const cant = iCant >= 0 ? numeroCsv(c[iCant]) : null;
+    const pct = iPct >= 0 ? numeroCsv(c[iPct]) : null;
+    if (cant === null) {   // sin cantidades: promedio simple
+      if (pct !== null) a.pctSimple.push(pct);
+      if (iMed >= 0) a.tmoSimple.push(segundosCsv(c[iMed]));
+      return;
+    }
+    if (!cant) return;     // cola sin llamadas atendidas: no pesa
+    a.atendidas += cant;
+    if (pct) a.ofrecidas += cant / (pct / 100);
+    a.hablado += iTot >= 0 ? segundosCsv(c[iTot]) : segundosCsv(c[iMed]) * cant;
+  });
+  const prom = (v) => v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
+  const porAgente = {};
+  Object.keys(acc).forEach((n) => {
+    const a = acc[n];
+    if (a.atendidas) porAgente[n] = { pct: a.ofrecidas ? Math.round(a.atendidas / a.ofrecidas * 1000) / 10 : null, tmo: Math.round(a.hablado / a.atendidas), llamadas: a.atendidas };
+    else if (a.pctSimple.length || a.tmoSimple.length) porAgente[n] = { pct: prom(a.pctSimple) === null ? null : Math.round(prom(a.pctSimple) * 10) / 10, tmo: prom(a.tmoSimple) === null ? null : Math.round(prom(a.tmoSimple)), llamadas: null };
+  });
+  return { formato: 'resumen', porAgente: porAgente, ignorados: Object.values(ignorados), meses: [] };
+}
+
+function importarCsv(ev, tipo) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const lector = new FileReader();
+  lector.onload = () => {
+    try {
+      const r = resumirCsvLlamadas(lector.result, tipo, RESP.equipo.agentes);
+      const nombres = Object.keys(r.porAgente);
+      if (!nombres.length) throw new Error('Ningún agente del CSV coincide con el equipo.');
+      if (r.meses.length && (r.meses.length > 1 || r.meses[0] !== MES) &&
+        !confirm('El archivo tiene llamadas de ' + r.meses.join(', ') + ' y estás cargando ' + mesInfo(MES).etiqueta + '. ¿Seguir igual?')) { ev.target.value = ''; return; }
+      nombres.forEach((nombre) => {
+        const a = r.porAgente[nombre], tr = document.querySelector('tr[data-ag="' + cssEsc(nombre) + '"]');
+        if (!tr) return;
+        const set = (name, v) => { if (v === null || v === undefined) return; const i = tr.querySelector('input[name=' + name + ']'); i.value = v; i.style.borderColor = 'var(--accent)'; };
+        if (tipo === 'entrantes') { set('pct', a.pct); set('tmo', a.tmo === null ? null : segTxt(a.tmo)); set('llamadas', a.llamadas); }
+        else { set('tmoSal', a.tmo === null ? null : segTxt(a.tmo)); set('salientes', a.llamadas); }
+      });
+      const raros = r.ignorados.filter((g) => g.motivo !== 'no está en el ranking');
+      const otros = r.ignorados.length - raros.length;
+      $('csvMsg').textContent = 'CSV ' + tipo + ': ' + nombres.length + ' agentes reconocidos' +
+        (otros ? ' · ' + otros + ' extensiones fuera del ranking ignoradas' : '') +
+        (raros.length ? ' · ⚠ ignorado: ' + raros.map((g) => g.texto + ' (' + g.motivo + ', ' + g.filas + ' filas)').join('; ') : '') +
+        '. Revisá y tocá "Guardar llamadas".';
+    } catch (e) { toast('CSV: ' + e.message, true); }
+    ev.target.value = '';
+  };
+  lector.readAsText(file, 'UTF-8');
+}
+
+async function guardarLlamadas() {
+  const ent = [], sal = [];
+  let error = null;
+  document.querySelectorAll('tr[data-ag]').forEach((tr) => {
+    const v = (n) => tr.querySelector('input[name=' + n + ']').value.trim();
+    const ag = tr.dataset.ag;
+    const pct = v('pct') === '' ? null : numeroCsv(v('pct'));
+    const tmo = v('tmo') === '' ? null : segundosCsv(v('tmo'));
+    if ((v('pct') !== '' && (pct === null || pct < 0 || pct > 100)) || (v('tmo') !== '' && !tmo)) error = 'Revisá los valores de ' + ag;
+    if (pct !== null || tmo !== null) ent.push({ agente: ag, pct: pct, tmo: tmo, llamadas: v('llamadas') === '' ? null : Number(v('llamadas')) });
+    const tmoS = v('tmoSal') === '' ? null : segundosCsv(v('tmoSal'));
+    if (tmoS !== null || v('salientes') !== '') sal.push({ agente: ag, tmo: tmoS, llamadas: v('salientes') === '' ? null : Number(v('salientes')) });
+  });
+  if (error) { toast(error, true); return; }
+  const btn = $('btnLlamadas');
+  btn.disabled = true;
+  try {
+    if (ent.length) await apiPost('guardarLlamadas', { mes: MES, tipo: 'entrantes', filas: ent });
+    if (sal.length) await apiPost('guardarLlamadas', { mes: MES, tipo: 'salientes', filas: sal });
+    await refrescar();
+    toast('Llamadas guardadas en la planilla');
+  } catch (e) { toast('No se guardó: ' + e.message, true); btn.disabled = false; }
+}
+
+// ============================================================================
+// EXPORTAR PNG
+// ============================================================================
+async function exportarPng() {
+  const btn = $('btnPng');
+  btn.disabled = true;
+  try {
+    if (!window.html2canvas) {
+      await new Promise((ok, mal) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'; s.onload = ok; s.onerror = () => mal(new Error('no se pudo cargar html2canvas')); document.head.appendChild(s); });
+    }
+    if (TAB !== 'ranking' && TAB !== 'especiales') { TAB = 'ranking'; render(); }
+    const nodo = $('vistaMes');
+    if (!nodo) throw new Error('No hay vista del mes para exportar.');
+    const lienzo = await window.html2canvas(nodo, { backgroundColor: '#0a0a0f', scale: 2, windowWidth: 1280, onclone: (doc) => {
+      const v = doc.getElementById('vistaMes');
+      v.style.padding = '20px'; v.style.width = '1240px';
+      v.querySelectorAll('button, .no-png').forEach((b) => b.remove());
+      const t = doc.createElement('div');
+      t.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:11px;letter-spacing:2px;color:#7c5cfc;text-transform:uppercase">Grupo Fiancar · Performance Contact Center</div>' +
+        '<div style="font-size:22px;font-weight:600;margin:4px 0 14px">' + esc(mesInfo(MES).etiqueta) + (TAB === 'especiales' ? ' · Evaluación especial' : '') + '</div>';
+      v.insertBefore(t, v.firstChild);
+    } });
+    const a = document.createElement('a');
+    a.download = 'performance_' + MES + (TAB === 'especiales' ? '_especiales' : '') + '.png';
+    a.href = lienzo.toDataURL('image/png');
+    a.click();
+    toast('PNG exportado');
+  } catch (e) { toast('No se pudo exportar: ' + e.message, true); }
+  btn.disabled = false;
+}
+
+// ============================================================================
+// EVENTOS
+// ============================================================================
+$('selMes').addEventListener('change', (ev) => { MES = ev.target.value; render(); });
+$('btnPng').addEventListener('click', exportarPng);
+$('tabs').addEventListener('click', (ev) => { const b = ev.target.closest('[data-tab]'); if (b) { TAB = b.dataset.tab; render(); window.scrollTo(0, 0); } });
+$('main').addEventListener('click', (ev) => {
+  const f = ev.target.closest('[data-ficha]');
+  if (f) { abrirFicha(f.dataset.ficha); return; }
+  const p = ev.target.closest('[data-accion="publicar"]');
+  if (p) publicar(p.dataset.valor);
+});
+$('capaModal').addEventListener('click', (ev) => { if (ev.target.dataset && ev.target.dataset.cerrar) cerrarFicha(); });
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') cerrarFicha(); });
+
+// ============================================================================
+// UTILIDADES
+// ============================================================================
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function cssEsc(s) { return String(s).replace(/["\\]/g, '\\$&'); }
+function sinTildes(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+function fmt(n, dec) { if (n === null || n === undefined) return '—'; return Number(n).toLocaleString('es-UY', { maximumFractionDigits: dec === undefined ? 1 : dec }); }
+function segTxt(s) { s = Math.round(s); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function semaforoDe(t) { return t >= 80 ? 'verde' : t >= 66 ? 'amarillo' : 'rojo'; }
+function hoyISO() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function fechaCorta(iso) { const p = iso.split('-'); const dias = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']; return dias[new Date(+p[0], p[1] - 1, +p[2]).getDay()] + ' ' + p[2] + '/' + p[1]; }
+function horaCorta(iso) { try { return new Date(iso).toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
+function setSync(txt, cls) { const c = $('chipSync'); c.textContent = txt; c.className = 'chip' + (cls ? ' ' + cls : ''); }
+let toastT = null;
+function toast(msg, err) {
+  $('capaToast').innerHTML = '<div class="toast' + (err ? ' err' : '') + '" role="status">' + esc(msg) + '</div>';
+  clearTimeout(toastT);
+  toastT = setTimeout(() => { $('capaToast').innerHTML = ''; }, err ? 6000 : 3000);
+}
+
+iniciar();
+</script>
+</body>
+</html>
