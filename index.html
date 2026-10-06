@@ -12,7 +12,7 @@
 // 🔗 URL DEL APPS SCRIPT — pegá acá la URL de la implementación (termina en /exec)
 //    Ver docs/INSTALACION.md, paso 4.
 // ============================================================================
-const API_URL = 'https://script.google.com/macros/s/AKfycbzg7uWBh9wJOFa7GePVA6AywcyyC64P5InHCI7wFSbylsi6YciJrrzjNGvYU0w3tTPTEQ/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyAM4ALkPa0DA233fRuj-jVjaJijXE9MI8qFAnoJ0Fd2mAcN_SHfoKP5nBHceqmFS3q0w/exec';
 </script>
 <style>
 :root {
@@ -324,7 +324,7 @@ function render() {
   const sel = $('selMes');
   sel.hidden = !RESP.meses.length;
   sel.innerHTML = RESP.meses.map((m) => '<option value="' + m.mes + '"' + (m.mes === MES ? ' selected' : '') + '>' +
-    esc(m.etiqueta) + (m.historico ? ' · histórico' : (admin && !m.publicado ? ' · borrador' : '')) + '</option>').join('');
+    esc(m.etiqueta) + (admin && !m.publicado ? ' · borrador' : '') + '</option>').join('');
   // Pestañas
   const tabs = [['ranking', 'Ranking'], ['especiales', 'Evaluación especial'], ['puntaje', 'Cómo se calcula']];
   if (admin) tabs.push(['carga', 'Carga de datos']);
@@ -361,7 +361,6 @@ function mesInfo(mes) { return (RESP.meses || []).filter((m) => m.mes === mes)[0
 function vistaRanking() {
   const info = mesInfo(MES), dm = RESP.datos[MES];
   if (!dm) return '';
-  if (info.historico) return vistaHistorico(info, dm.historico);
   const admin = esAdmin();
   let h = '<div id="vistaMes">';
   // Barra de estado del mes
@@ -425,22 +424,6 @@ function filaRanking(a) {
     '<div class="tot"><span class="sem bg-' + a.semaforo + '"></span><span class="v c-' + a.semaforo + '">' + fmt(a.total) + '</span></div>' +
     '</div>';
 }
-
-// ============================================================================
-// VISTA: MES HISTÓRICO (migrado, no se recalcula)
-// ============================================================================
-function vistaHistorico(info, hist) {
-  let h = '<div id="vistaMes"><div class="banner warn"><span class="grow"><b>' + esc(info.etiqueta) + ' · Histórico.</b> ' +
-    'Datos migrados de la versión anterior. Se muestran tal cual se comunicaron: solo leads, con la fórmula y la escala vieja (leads /25). No se comparan con los meses nuevos.</span></div>';
-  h += '<div class="rk scroll"><table class="t"><thead><tr><th>Agente</th><th class="r">Días</th><th class="r">Promedio /10</th><th class="r">Leads /25</th></tr></thead><tbody>';
-  hist.agentes.forEach((a) => {
-    h += '<tr><td class="txt">' + esc(a.nombre) + (a.activo ? '' : ' <span class="chip" style="margin-left:6px">ex equipo</span>') + '</td>' +
-      '<td class="r">' + a.diasConDatos + '</td><td class="r">' + fmt(a.promedio, 2) + '</td><td class="r"><b>' + fmt(a.ptsViejo) + '</b></td></tr>';
-  });
-  h += '</tbody></table></div></div>';
-  return h;
-}
-
 // ============================================================================
 // FICHA INDIVIDUAL
 // ============================================================================
@@ -527,7 +510,6 @@ function graficoTmo(a, dm) {
 // ============================================================================
 function vistaEspeciales() {
   const info = mesInfo(MES), dm = RESP.datos[MES];
-  if (info.historico) return '<div class="vacio"><b>' + esc(info.etiqueta) + ' es un mes histórico</b>La evaluación especial empieza con los meses nuevos.</div>';
   const admin = esAdmin();
   let h = '<div id="vistaMes"><div class="banner"><span class="grow"><b>Evaluación especial · ' + esc(info.etiqueta) + '.</b> Piero y Shoanna tienen su propia rúbrica: no entran al ranking ni a los promedios del equipo.</span></div><div class="grid2">';
   dm.especiales.forEach((s) => {
@@ -605,7 +587,7 @@ let CARGA_MES = null;
 function mesDeCarga() {
   if (!CARGA_MES) {
     const sel = MES ? mesInfo(MES) : null;
-    CARGA_MES = sel && !sel.historico ? MES : hoyISO().slice(0, 7);
+    CARGA_MES = sel ? MES : hoyISO().slice(0, 7);
   }
   return CARGA_MES;
 }
@@ -622,7 +604,7 @@ function vistaCarga() {
   const info = mesInfo(mes);
   const dm = RESP.datos[mes] && RESP.datos[mes].agentes ? RESP.datos[mes] : null;
   const etiqueta = etiquetaDe(mes);
-  const historico = !!(info && info.historico);
+  const anterior = !!(RESP.primerMes && mes < RESP.primerMes);   // antes del primer mes no se carga nada
   const porNombre = (n) => (dm ? dm.agentes.filter((a) => a.nombre === n)[0] : null);
   const porExt = agentes.slice().sort((x, y) => x.ext.localeCompare(y.ext));
   const porNom = agentes.slice().sort((x, y) => x.nombre.localeCompare(y.nombre));
@@ -630,9 +612,9 @@ function vistaCarga() {
 
   // ---- Mes de carga
   h += '<div class="banner"><span class="grow"><b>Mes que estás cargando:</b> llamadas, campañas y días hábiles se guardan en este mes. ' +
-    (info ? (historico ? '<span class="c-amarillo">Es un mes histórico: no se edita.</span>' : (info.publicado ? 'Publicado: el equipo lo ve.' : 'Borrador: el equipo todavía no lo ve.'))
+    (anterior ? '<span class="c-amarillo">El sistema arranca en ' + esc(etiquetaDe(RESP.primerMes)) + ': lo anterior no se carga.</span>' : info ? (info.publicado ? 'Publicado: el equipo lo ve.' : 'Borrador: el equipo todavía no lo ve.')
       : 'Todavía no tiene datos: se crea con lo primero que guardes.') + '</span>' +
-    '<input class="inp" type="month" id="mesCarga" value="' + mes + '" style="width:auto" aria-label="Mes que estás cargando"></div>';
+    '<input class="inp" type="month" id="mesCarga" value="' + mes + '" min="' + (RESP.primerMes || '') + '" style="width:auto" aria-label="Mes que estás cargando"></div>';
 
   // ---- Leads del día
   h += '<div class="grid2"><div class="card"><h3>Cargar leads del día</h3><div class="sub">Escribe directo en la pestaña <span class="mono">leads</span> de la planilla. Guardar el mismo día y agente pisa la fila anterior.</div>' +
@@ -653,8 +635,8 @@ function vistaCarga() {
 
   // ---- Estado del mes
   h += '<div class="card"><h3>' + esc(etiqueta) + '</h3><div class="sub">Días hábiles, publicación y control de carga.</div>';
-  if (historico) {
-    h += '<p class="nota">Mes histórico (migrado de la versión vieja): no se edita. Elegí otro mes arriba para cargar.</p>';
+  if (anterior) {
+    h += '<p class="nota">El sistema arranca en ' + esc(etiquetaDe(RESP.primerMes)) + '. Elegí ese mes o uno posterior arriba.</p>';
   } else {
     h += '<form class="form" id="fMes"><div class="f-row" style="grid-template-columns:1fr auto"><div class="fld"><label for="mDias">Días hábiles</label>' +
       '<input class="inp" type="number" id="mDias" min="1" max="31" value="' + ((info && info.diasHabiles) || '') + '"></div>' +
@@ -670,12 +652,12 @@ function vistaCarga() {
   }
   h += '</div></div>';
 
-  if (historico) return h + avisosHtml();
+  if (anterior) return h + avisosHtml();
 
   // ---- Llamadas
-  h += '<div class="h-sec">Llamadas · ' + esc(etiqueta) + '</div><div class="card"><div class="sub">Elegí el archivo tal cual lo bajás de 3CX: se guarda solo en <b>' + esc(etiqueta) + '</b>. ' +
+  h += '<div class="h-sec">Llamadas · ' + esc(etiqueta) + '</div><div class="card"><div class="sub">Importá el archivo de 3CX y después tocá <b>Guardar datos importados</b>, abajo de todo. ' +
     'Entrantes (<span class="mono">agents_in_queue_statistics</span>) da el % atendidas y el TMO que puntúan; salientes (<span class="mono">outbound_calls</span>) es informativo.</div>' +
-    '<div class="acciones" style="margin-bottom:10px"><span class="btn pri file">Importar CSV entrantes<input type="file" accept=".csv,text/csv" id="csvIn"></span>' +
+    '<div class="acciones" style="margin-bottom:10px"><span class="btn file">Importar CSV entrantes<input type="file" accept=".csv,text/csv" id="csvIn"></span>' +
     '<span class="btn file">Importar CSV salientes<input type="file" accept=".csv,text/csv" id="csvOut"></span><span class="nota" id="csvMsg">' + esc(MSG_LLAMADAS) + '</span></div>' +
     '<div class="scroll"><table class="t tbl-inp"><thead><tr><th>Agente</th><th>% Atendidas</th><th>TMO (m:ss)</th><th>Llamadas</th><th>TMO salientes</th><th>Salientes</th></tr></thead><tbody>' +
     porExt.map((ag) => {
@@ -688,7 +670,7 @@ function vistaCarga() {
         '<td><input class="inp sm" name="tmoSal" value="' + (C && C.tmoSalientes !== null ? C.tmoSalientesTxt : '') + '"></td>' +
         '<td><input class="inp sm" name="salientes" inputmode="numeric" value="' + v(C && C.salientes) + '"></td></tr>';
     }).join('') + '</tbody></table></div>' +
-    '<div class="acciones" style="margin-top:10px"><button class="btn" id="btnLlamadas">Guardar correcciones</button><span class="nota">Solo si cambiaste algún valor a mano.</span></div></div>';
+    '<div class="acciones" style="margin-top:12px"><button class="btn pri" id="btnLlamadas">Guardar datos importados</button></div></div>';
 
   // ---- Campañas
   h += '<div class="h-sec">Campañas ganadas · ' + esc(etiqueta) + '</div><div class="card"><form id="fCamp"><div class="f-row" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">' +
@@ -853,33 +835,29 @@ function importarCsv(ev, tipo) {
   if (!file) return;
   const lector = new FileReader();
   lector.onload = async () => {
-    $('csvMsg').textContent = 'Importando ' + file.name + '…';
-    document.querySelectorAll('.file').forEach((b) => b.setAttribute('disabled', ''));
+    $('csvMsg').textContent = 'Leyendo ' + file.name + '…';
     try {
-      const datos = { mes: mesDeCarga(), tipo: tipo, texto: lector.result };
-      let r = await apiPost('importarLlamadas', datos);
-      if (r.confirmar) {
-        if (!confirm(r.confirmar)) { $('csvMsg').textContent = 'Cancelado: no se guardó nada.'; return; }
-        datos.confirmarMes = true;
-        r = await apiPost('importarLlamadas', datos);
-      }
-      const nombres = Object.keys(r.porAgente);
+      // Solo lee el archivo y llena la tabla. Se guarda con "Guardar datos importados".
+      const r = await apiPost('leerLlamadas', { mes: mesDeCarga(), tipo: tipo, texto: lector.result });
+      if (r.otroMes && !confirm(r.otroMes + ' ¿Usarlo igual?')) { $('csvMsg').textContent = 'Cancelado.'; return; }
+      Object.keys(r.porAgente).forEach((nombre) => {
+        const a = r.porAgente[nombre], tr = document.querySelector('tr[data-ag="' + cssEsc(nombre) + '"]');
+        if (!tr) return;
+        const set = (name, v) => { if (v === null || v === undefined) return; const i = tr.querySelector('input[name=' + name + ']'); i.value = v; i.style.borderColor = 'var(--accent)'; };
+        if (tipo === 'entrantes') { set('pct', a.pct); set('tmo', a.tmo === null ? null : segTxt(a.tmo)); set('llamadas', a.llamadas); }
+        else { set('tmoSal', a.tmo === null ? null : segTxt(a.tmo)); set('salientes', a.llamadas); }
+      });
       const raros = r.ignorados.filter((g) => g.motivo !== 'no está en el ranking');
-      MSG_LLAMADAS = '✓ ' + file.name + ': llamadas ' + tipo + ' guardadas para ' + nombres.length + ' agentes.' +
-        (raros.length ? ' ⚠ Ignorado: ' + raros.map((g) => g.texto + ' (' + g.motivo + ', ' + g.filas + ' filas)').join('; ') + '.' : '');
-      await refrescar();
-      toast('Llamadas ' + tipo + ' importadas');
+      $('csvMsg').textContent = file.name + ' importado. Falta guardar: tocá "Guardar datos importados" abajo.' +
+        (raros.length ? ' ⚠ Ignorado: ' + raros.map((g) => g.texto + ' (' + g.motivo + ')').join('; ') + '.' : '');
     } catch (e) {
       $('csvMsg').textContent = '';
-      toast('No se importó: ' + e.message, true);
-    } finally {
-      document.querySelectorAll('.file').forEach((b) => b.removeAttribute('disabled'));
+      toast('No se pudo leer el archivo: ' + e.message, true);
     }
   };
   lector.readAsText(file, 'UTF-8');
   input.value = '';
 }
-
 async function guardarLlamadas() {
   const ent = [], sal = [];
   let error = null;
@@ -899,6 +877,7 @@ async function guardarLlamadas() {
   try {
     if (ent.length) await apiPost('guardarLlamadas', { mes: mesDeCarga(), tipo: 'entrantes', filas: ent });
     if (sal.length) await apiPost('guardarLlamadas', { mes: mesDeCarga(), tipo: 'salientes', filas: sal });
+    MSG_LLAMADAS = '✓ Llamadas guardadas en la planilla.';
     await refrescar();
     toast('Llamadas guardadas en la planilla');
   } catch (e) { toast('No se guardó: ' + e.message, true); btn.disabled = false; }
@@ -941,7 +920,7 @@ async function exportarPng() {
 $('selMes').addEventListener('change', (ev) => {
   MES = ev.target.value;
   const info = mesInfo(MES);
-  if (info && !info.historico) { CARGA_MES = MES; MSG_LLAMADAS = ''; }
+  if (info) { CARGA_MES = MES; MSG_LLAMADAS = ''; }
   render();
 });
 $('btnPng').addEventListener('click', exportarPng);
