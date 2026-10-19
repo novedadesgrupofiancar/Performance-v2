@@ -735,32 +735,93 @@ function prepararControl() {
   }));
 }
 
-/** Junta varios CSV de Vtiger en uno (por nombre de columna) y saca los leads repetidos. */
+// ---- Export "de la lista" de Vtiger (solo las columnas visibles, nombres completos, fechas "01-10-2026 4:28 PM").
+// Se traduce al formato del export completo para que el Apps Script lo entienda igual.
+const VT_AGENTES = { 'alvaro cuello': 'alvcue', 'sabrina lapaz': 'slapaz', 'damian chmiel': 'damchm', 'melanie barrero': 'melbar', 'gianine pereda': 'gpereda', 'natasha piria': 'natpir', 'natasha piriz': 'natpir' };
+const VT_NO_VENDEDORES = { 'carolina martinez': 'carmar', 'piero paganini': 'piepag' };
+// Usuarios que no son vendedores sin código conocido, y grupos: quedan con espacios y el Apps Script los marca "Mal derivado".
+const VT_NO_VEND_NOMBRES = ['macarena martinez', 'macarena nunez', 'ana paula', 'angeles'];
+const VT_GRUPO = /\b(ventas|ecom|cc|fiancar|grupo|equipo|call ?center)\b/i;
+
+function fechaVtigerISO(s) {
+  const m = String(s || '').trim().match(/^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)?)?/i);
+  if (!m) return s;
+  let h = Number(m[4] || 0);
+  if (m[7]) { const pm = m[7].toUpperCase() === 'PM'; if (pm && h < 12) h += 12; if (!pm && h === 12) h = 0; }
+  return m[3] + '-' + m[2] + '-' + m[1] + ' ' + String(h).padStart(2, '0') + ':' + (m[5] || '00') + ':' + (m[6] || '00');
+}
+
+function usuarioVtiger(nombre) {
+  const n = sinTildes(nombre);
+  if (!n) return nombre;
+  if (VT_AGENTES[n]) return VT_AGENTES[n];
+  if (VT_NO_VENDEDORES[n]) return VT_NO_VENDEDORES[n];
+  if (VT_GRUPO.test(n) || VT_NO_VEND_NOMBRES.some((x) => n.indexOf(x) === 0)) return nombre;   // con espacios = no vendedor
+  return String(nombre).trim().replace(/\s+/g, '_');   // vendedor (persona): sin espacios
+}
+
+/** Si la fila viene del export de la lista, la completa al formato del export completo. */
+function adaptarFilaLista(o, info) {
+  if ('Fecha de Asignado' in o && 'Fecha de Modificación' in o) return o;
+  info.formatoLista = true;
+  const creacion = fechaVtigerISO(o['Fecha de Creación']);
+  o['Fecha de Creación'] = creacion;
+  o['Asignado a'] = usuarioVtiger(o['Asignado a']);
+  // Sin fechas de asignación/modificación: el día de referencia es el de creación del lead.
+  o['Fecha de Asignado'] = creacion;
+  o['Fecha de Modificación'] = creacion;
+  // Sin "Fecha último comentario" no se puede auditar: se marca como "con comentario" y se avisa en pantalla.
+  if (!('Fecha último comentario' in o)) { o['Fecha último comentario'] = 'sin dato'; info.sinComentarios = true; }
+  return o;
+}
+
+/** Junta varios CSV de Vtiger en uno (por nombre de columna), saca los leads repetidos y adapta el export de la lista. */
 function unirCsvs(textos) {
-  if (textos.length === 1) return textos[0];
+  CONTROL.formato = { formatoLista: false, sinComentarios: false };
   const partir = (texto) => {
     if (texto.charCodeAt(0) === 0xFEFF) texto = texto.slice(1);
-    const filas = []; let fila = [], cur = '', q = false;
-    for (let i = 0; i < texto.length; i++) {
-      const ch = texto[i];
-      if (q) { if (ch === '"' && texto[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
-      else if (ch === '"') q = true;
-      else if (ch === ',') { fila.push(cur.trim()); cur = ''; }
-      else if (ch === '\n' || ch === '\r') { if (ch === '\r' && texto[i + 1] === '\n') i++; fila.push(cur.trim()); cur = ''; if (fila.some((c) => c !== '')) filas.push(fila); fila = []; }
-      else cur += ch;
-    }
-    fila.push(cur.trim()); if (fila.some((c) => c !== '')) filas.push(fila);
-    return filas;
+    // Archivo guardado con la codificación equivocada ("CreaciÃ³n"): se corrige.
+    if (/Ã[\u0080-\u00bf]/.test(texto)) { try { texto = decodeURIComponent(escape(texto)); } catch (e) {} }
+    const fin = texto.indexOf('\n'), primera = fin < 0 ? texto : texto.slice(0, fin);
+    const sep = primera.split(';').length > primera.split(',').length ? ';' : ',';   // Excel en español guarda con ";"
+    // Vtiger a veces deja una comilla sin cerrar al cortar una descripción con "...". Para que una fila rota
+    // no desordene las siguientes, se separa primero por registro (cada registro arranca con "valor","...)
+    // y se lee cada uno por separado.
+    const inicio = new RegExp('^"[^"]*"\\s*' + (sep === ';' ? ';' : ',') + '\\s*"');
+    const registros = [];
+    texto.split(/\r?\n/).forEach((l) => {
+      if (!registros.length || inicio.test(l)) registros.push(l); else registros[registros.length - 1] += '\n' + l;
+    });
+    const leerRegistro = (s) => {
+      const fila = []; let cur = '', q = false;
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (q) { if (ch === '"' && s[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+        else if (ch === '"') q = true;
+        else if (ch === sep) { fila.push(cur.trim()); cur = ''; }
+        else cur += ch;
+      }
+      fila.push(cur.trim());
+      return fila;
+    };
+    return registros.map(leerRegistro).filter((f) => f.some((c) => c !== ''));
   };
+  // Nombres de columna exactos que usa el control (se aceptan con o sin tildes / mayúsculas).
+  const canon = {};
+  ['Asignado a', 'Fase de Venta', 'Fecha de Creación', 'Derivado por', 'Suborigen', 'Número Lead', 'Nombre Lead', 'Nombre De Contacto',
+    'Fecha de Asignado', 'Fecha de Tomada', 'Fecha último comentario', 'Comentario', 'Fecha de Modificación'].forEach((c) => { canon[sinTildes(c).replace(/[^a-z]/g, '')] = c; });
+  const nombreCol = (h) => canon[sinTildes(h).replace(/[^a-z]/g, '')] || h;
   const columnas = [], filas = [], vistos = {};
+  const agregarCol = (h) => { if (columnas.indexOf(h) < 0) columnas.push(h); };
   textos.forEach((t) => {
     const f = partir(t);
-    const enc = f[0] || [];
-    enc.forEach((h) => { if (columnas.indexOf(h) < 0) columnas.push(h); });
-    const iNum = enc.findIndex((h) => sinTildes(h).replace(/[^a-z]/g, '') === 'numerolead');
+    const enc = (f[0] || []).map(nombreCol);
+    enc.forEach(agregarCol);
     f.slice(1).forEach((r) => {
-      const obj = {}; enc.forEach((h, i) => { obj[h] = r[i] || ''; });
-      const k = iNum >= 0 ? r[iNum] : null;
+      let obj = {}; enc.forEach((h, i) => { obj[h] = r[i] || ''; });
+      obj = adaptarFilaLista(obj, CONTROL.formato);
+      Object.keys(obj).forEach(agregarCol);
+      const k = obj['Número Lead'] || null;
       if (k && vistos[k] !== undefined) filas[vistos[k]] = obj; else { if (k) vistos[k] = filas.length; filas.push(obj); }
     });
   });
@@ -822,7 +883,10 @@ function cartelControl() {
   if (CONTROL.estado === 'guardado' && c) return caja('bien', '✓', 'Guardado en la planilla', 'El control del ' + esc(fechaCorta(CONTROL.fecha)) + ' ya está en el puntaje de leads de los 6 agentes. Lo podés ver en la pestaña Ranking.');
   if (c) {
     const tuyos = c.agentes.reduce((s, a) => s + a.leads.length, 0);
-    const pagina = c.leidos === 20 ? '<div class="aviso-extra">⚠ El archivo trae exactamente 20 leads: parece una sola página de la lista de Vtiger y no la vista completa de tus agentes. Revisá el export antes de guardar.</div>' : '';
+    const fmtLista = CONTROL.formato && CONTROL.formato.formatoLista
+      ? '<div class="aviso-extra">ⓘ Es el export de la lista (solo columnas visibles): el día se toma por la <b>fecha de creación</b> del lead' +
+        (CONTROL.formato.sinComentarios ? ' y <b>no se controlan los comentarios</b> (el archivo no trae "Fecha último comentario")' : '') + '.</div>' : '';
+    const pagina = fmtLista + (c.leidos === 20 ?'<div class="aviso-extra">⚠ El archivo trae exactamente 20 leads: parece una sola página de la lista de Vtiger y no la vista completa de tus agentes. Revisá el export antes de guardar.</div>' : '');
     return caja('bien', '✓', 'Importado: ' + esc(CONTROL.archivo),
       c.leidos + ' leads leídos · ' + tuyos + ' de tus agentes · calculado a las ' + esc(c.ahora.slice(11)) + '.<br><b>Falta un paso:</b> marcá "Tarea al día" de los 6 y tocá <b>Guardar control del día</b> (abajo de todo).' + pagina);
   }
