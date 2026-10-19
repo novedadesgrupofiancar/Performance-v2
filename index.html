@@ -610,7 +610,7 @@ const CONTROL = { fecha: hoyISO(), textos: [], archivo: '', res: null, tareas: {
 function vistaControl() {
   const c = CONTROL.res;
   let h = '<div class="card"><div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">' +
-    '<div style="flex:1;min-width:220px"><h3>Control de leads de la tarde</h3><div class="sub" style="margin-bottom:0">Exportá de Vtiger las listas "CX Pendientes" y "CX Hoy" y elegí los dos archivos juntos. Solo cuentan tus 6 agentes.</div></div>' +
+    '<div style="flex:1;min-width:220px"><h3>Control de leads de la tarde</h3><div class="sub" style="margin-bottom:0">Exportá de Vtiger los leads del día y elegí todos los archivos juntos (podés elegir varios). Solo cuentan tus 6 agentes.</div></div>' +
     '<div class="fld"><label for="ctlFecha">Día del control</label><input class="inp" type="date" id="ctlFecha" value="' + CONTROL.fecha + '" min="' + (RESP.primerMes ? RESP.primerMes + '-01' : '') + '"></div>' +
     '<span class="btn pri file">Importar exports de Vtiger<input type="file" accept=".csv,text/csv" id="ctlArchivo" multiple></span></div>' +
     '</div>' + cartelControl();
@@ -705,7 +705,7 @@ function prepararControl() {
     if (CONTROL.textos.length) leerControl(); else render();
   });
   $('ctlArchivo').addEventListener('change', (ev) => {
-    // Se pueden elegir los dos archivos juntos (CX Pendientes y CX Hoy).
+    // Se pueden elegir los dos archivos juntos (varios exports de Vtiger).
     const files = Array.from(ev.target.files);
     if (!files.length) return;
     Promise.all(files.map((f) => new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = mal; r.readAsText(f, 'UTF-8'); })))
@@ -826,7 +826,7 @@ function cartelControl() {
     return caja('bien', '✓', 'Importado: ' + esc(CONTROL.archivo),
       c.leidos + ' leads leídos · ' + tuyos + ' de tus agentes · calculado a las ' + esc(c.ahora.slice(11)) + '.<br><b>Falta un paso:</b> marcá "Tarea al día" de los 6 y tocá <b>Guardar control del día</b> (abajo de todo).' + pagina);
   }
-  return caja('info', '1', 'Importá el export de Vtiger del ' + esc(fechaCorta(CONTROL.fecha)), 'Tocá <b>Importar exports de Vtiger</b> y elegí los archivos de las listas "CX Pendientes" y "CX Hoy". Acá vas a ver si se importó bien.');
+  return caja('info', '1', 'Importá el export de Vtiger del ' + esc(fechaCorta(CONTROL.fecha)), 'Tocá <b>Importar exports de Vtiger</b> y elegí los archivos exportados de Vtiger (podés elegir varios juntos). Acá vas a ver si se importó bien.');
 }
 
 function copiarTexto(txt) {
