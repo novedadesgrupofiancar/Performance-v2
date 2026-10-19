@@ -66,6 +66,10 @@ main { max-width: 1280px; margin: 0 auto; padding: 16px; }
 .aviso.mal .aviso-i { color: var(--red); }
 .aviso.info { border-color: rgba(124, 92, 252, .5); background: var(--accent-soft); }
 .aviso-extra { margin-top: 8px; color: var(--yellow); }
+.grilla td, .grilla th { padding: 6px 5px; }
+.grilla button.dia { background: none; border: 1px solid transparent; color: var(--text2); font-family: var(--mono); font-size: 11px; padding: 2px 4px; cursor: pointer; }
+.grilla button.dia:hover { border-color: var(--accent); color: var(--text); }
+.grilla button.dia.on { background: var(--accent); color: #fff; }
 .banner .grow { flex: 1; min-width: 200px; }
 .h-sec { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text2); margin: 18px 0 10px; display: flex; align-items: center; gap: 10px; }
 .h-sec::after { content: ''; flex: 1; height: 1px; background: var(--border); }
@@ -606,11 +610,11 @@ const CONTROL = { fecha: hoyISO(), textos: [], archivo: '', res: null, tareas: {
 function vistaControl() {
   const c = CONTROL.res;
   let h = '<div class="card"><div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">' +
-    '<div style="flex:1;min-width:220px"><h3>Control de leads de la tarde</h3><div class="sub" style="margin-bottom:0">Exportá de Vtiger las vistas "CX Pendientes" y "CX Derivados" y elegí los dos archivos juntos. Solo cuentan tus 6 agentes.</div></div>' +
+    '<div style="flex:1;min-width:220px"><h3>Control de leads de la tarde</h3><div class="sub" style="margin-bottom:0">Exportá de Vtiger las listas "CX Pendientes" y "CX Hoy" y elegí los dos archivos juntos. Solo cuentan tus 6 agentes.</div></div>' +
     '<div class="fld"><label for="ctlFecha">Día del control</label><input class="inp" type="date" id="ctlFecha" value="' + CONTROL.fecha + '" min="' + (RESP.primerMes ? RESP.primerMes + '-01' : '') + '"></div>' +
     '<span class="btn pri file">Importar exports de Vtiger<input type="file" accept=".csv,text/csv" id="ctlArchivo" multiple></span></div>' +
     '</div>' + cartelControl();
-  if (!c) return h;
+  if (!c) return h + grillaMesLeads();
 
   const eq = c.equipo;
   h += '<div class="tiles" style="margin-top:12px">' +
@@ -649,6 +653,49 @@ function vistaControl() {
 
   h += '<div class="card" style="margin-top:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn pri" id="ctlGuardar">Guardar control del día</button>' +
     '<span class="nota">' + (CONTROL.guardado ? '✓ Guardado: los leads del ' + esc(fechaCorta(CONTROL.fecha)) + ' ya están en el puntaje.' : 'Marcá "Tarea al día" de los 6 y guardá: esto carga el puntaje de leads del ' + esc(fechaCorta(CONTROL.fecha)) + '.') + '</span></div>';
+  return h + grillaMesLeads();
+}
+
+/**
+ * Grilla del mes: qué días se cargaron y el puntaje de leads de cada agente por día.
+ * Sale de la pestaña `leads` (lo guardado por el control o a mano), así que coincide con el Ranking.
+ */
+function grillaMesLeads() {
+  const mes = CONTROL.fecha.slice(0, 7);
+  const dm = RESP.datos[mes];
+  const etiqueta = etiquetaDe(mes);
+  const hoy = hoyISO();
+  // Días hábiles del mes (lunes a viernes) hasta hoy.
+  const dias = [];
+  const p = mes.split('-').map(Number);
+  for (let d = 1; d <= 31; d++) {
+    const f = new Date(p[0], p[1] - 1, d);
+    if (f.getMonth() !== p[1] - 1) break;
+    const iso = mes + '-' + String(d).padStart(2, '0');
+    if (iso > hoy) break;
+    if (f.getDay() !== 0 && f.getDay() !== 6) dias.push(iso);
+  }
+  let h = '<div class="h-sec">Días cargados · ' + esc(etiqueta) + '</div>';
+  if (!dm || !dm.agentes || !dias.length) return h + '<div class="card"><p class="nota">Todavía no hay días cargados en ' + esc(etiqueta) + '.</p></div>';
+  const porAgente = {};
+  dm.agentes.forEach((a) => { porAgente[a.nombre] = {}; a.leads.dias.forEach((d) => { porAgente[a.nombre][d.fecha] = d; }); });
+  const cargados = dias.filter((f) => dm.agentes.some((a) => porAgente[a.nombre][f]));
+  const faltan = dias.filter((f) => cargados.indexOf(f) < 0);
+  h += '<div class="card"><div class="nota" style="margin-bottom:10px"><b>' + cargados.length + ' de ' + dias.length + '</b> días hábiles cargados hasta hoy' +
+    (faltan.length ? ' · <span class="c-amarillo">faltan: ' + faltan.map(fechaCorta).join(', ') + '</span>' : ' · <span class="c-verde">no falta ninguno</span>') +
+    '. Tocá un día para controlarlo.</div><div class="scroll"><table class="t grilla"><thead><tr><th>Agente</th>' +
+    dias.map((f) => '<th class="r"><button class="dia' + (f === CONTROL.fecha ? ' on' : '') + '" data-dia="' + f + '" title="Controlar el ' + fechaCorta(f) + '">' + Number(f.slice(8)) + '</button></th>').join('') +
+    '<th class="r">Leads /30</th></tr></thead><tbody>' +
+    dm.agentes.slice().sort((x, y) => x.nombre.localeCompare(y.nombre)).map((a) => '<tr><td class="txt">' + esc(a.nombre) + '</td>' +
+      dias.map((f) => {
+        const d = porAgente[a.nombre][f];
+        if (!d) return '<td class="r muted" title="Sin cargar">—</td>';
+        if (d.score === null) return '<td class="r muted" title="Cargado, sin leads">s/l</td>';
+        const col = d.score >= 8 ? 'c-verde' : d.score >= 6.6 ? 'c-amarillo' : 'c-rojo';
+        return '<td class="r ' + col + '" title="' + d.totales + ' leads · ' + d.sinGestionar + ' sin gestionar · ' + d.errores + ' errores · tarea ' + (d.tarea ? 'SI' : 'NO') + '">' + fmt(d.score, 1) + '</td>';
+      }).join('') +
+      '<td class="r"><b>' + (a.leads.sinDatos ? '—' : fmt(a.leads.pts)) + '</b></td></tr>').join('') +
+    '</tbody></table></div><p class="nota" style="margin-top:8px">— sin cargar · s/l cargado sin leads · el número es el puntaje del día (0 a 10). Leads /30 es lo que suma en el Ranking.</p></div>';
   return h;
 }
 
@@ -658,7 +705,7 @@ function prepararControl() {
     if (CONTROL.textos.length) leerControl(); else render();
   });
   $('ctlArchivo').addEventListener('change', (ev) => {
-    // Se pueden elegir los dos archivos juntos (CX Pendientes y CX Derivados).
+    // Se pueden elegir los dos archivos juntos (CX Pendientes y CX Hoy).
     const files = Array.from(ev.target.files);
     if (!files.length) return;
     Promise.all(files.map((f) => new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = mal; r.readAsText(f, 'UTF-8'); })))
@@ -679,6 +726,13 @@ function prepararControl() {
   }));
   const g = $('ctlGuardar');
   if (g) g.addEventListener('click', guardarControl);
+  // Tocar un día de la grilla lo elige como "Día del control" (hay que importar el export de ese día).
+  document.querySelectorAll('[data-dia]').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.dia === CONTROL.fecha) return;
+    Object.assign(CONTROL, { fecha: b.dataset.dia, textos: [], archivo: '', res: null, tareas: {}, guardado: false, estado: 'vacio', error: '' });
+    render();
+    window.scrollTo(0, 0);
+  }));
 }
 
 /** Junta varios CSV de Vtiger en uno (por nombre de columna) y saca los leads repetidos. */
@@ -772,7 +826,7 @@ function cartelControl() {
     return caja('bien', '✓', 'Importado: ' + esc(CONTROL.archivo),
       c.leidos + ' leads leídos · ' + tuyos + ' de tus agentes · calculado a las ' + esc(c.ahora.slice(11)) + '.<br><b>Falta un paso:</b> marcá "Tarea al día" de los 6 y tocá <b>Guardar control del día</b> (abajo de todo).' + pagina);
   }
-  return caja('info', '1', 'Importá el export de Vtiger de hoy', 'Tocá <b>Importar exports de Vtiger</b> y elegí el archivo. Acá vas a ver si se importó bien.');
+  return caja('info', '1', 'Importá el export de Vtiger del ' + esc(fechaCorta(CONTROL.fecha)), 'Tocá <b>Importar exports de Vtiger</b> y elegí los archivos de las listas "CX Pendientes" y "CX Hoy". Acá vas a ver si se importó bien.');
 }
 
 function copiarTexto(txt) {
