@@ -57,6 +57,15 @@ main { max-width: 1280px; margin: 0 auto; padding: 16px; }
 .banner { border: 1px solid var(--border2); background: var(--s1); padding: 10px 12px; margin-bottom: 14px; font-size: 13px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .banner.warn { border-color: rgba(245, 200, 66, .4); }
 .banner.err { border-color: rgba(255, 58, 92, .45); }
+.aviso { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; margin: 12px 0; border: 1px solid var(--border2); background: var(--s1); font-size: 14px; line-height: 1.5; }
+.aviso b { font-weight: 600; }
+.aviso-i { font-size: 20px; line-height: 1; min-width: 24px; text-align: center; font-family: var(--mono); }
+.aviso.bien { border-color: var(--green); background: rgba(34, 212, 122, .08); }
+.aviso.bien .aviso-i { color: var(--green); }
+.aviso.mal { border-color: var(--red); background: rgba(255, 58, 92, .08); }
+.aviso.mal .aviso-i { color: var(--red); }
+.aviso.info { border-color: rgba(124, 92, 252, .5); background: var(--accent-soft); }
+.aviso-extra { margin-top: 8px; color: var(--yellow); }
 .banner .grow { flex: 1; min-width: 200px; }
 .h-sec { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text2); margin: 18px 0 10px; display: flex; align-items: center; gap: 10px; }
 .h-sec::after { content: ''; flex: 1; height: 1px; background: var(--border); }
@@ -250,9 +259,17 @@ async function apiPost(accion, datos) {
   if (MODO_MOCK) res = MOCK.post(ADMIN_KEY, accion, datos);
   else {
     // text/plain evita el preflight CORS que Apps Script no soporta.
-    const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: ADMIN_KEY, accion: accion, datos: datos }) });
-    res = await r.json();
+    // Si la planilla no responde en 60 s, se corta con un error claro (nunca queda "cargando" para siempre).
+    const corte = new AbortController();
+    const reloj = setTimeout(() => corte.abort(), 60000);
+    let r;
+    try {
+      r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ token: ADMIN_KEY, accion: accion, datos: datos }), signal: corte.signal });
+    } catch (e) {
+      throw new Error(e.name === 'AbortError' ? 'la planilla no respondió en 60 segundos. Probá de nuevo.' : 'no hay conexión con la planilla (' + e.message + '). Si usás Brave, desactivá Shields para esta página.');
+    } finally { clearTimeout(reloj); }
+    try { res = await r.json(); } catch (e) { throw new Error('la planilla respondió algo inesperado (HTTP ' + r.status + ').'); }
   }
   if (!res.ok && !res.confirmar) throw new Error(res.error || 'Error desconocido');
   return res;
@@ -584,15 +601,15 @@ function vistaPuntaje() {
 // Se importa el export de Vtiger de la tarde: el Apps Script calcula todo (acción leerVtiger)
 // y "Guardar control del día" lo pasa al puntaje de leads (acción guardarControlLeads).
 // ============================================================================
-const CONTROL = { fecha: hoyISO(), texto: '', archivo: '', res: null, tareas: {}, guardado: false };
+const CONTROL = { fecha: hoyISO(), textos: [], archivo: '', res: null, tareas: {}, guardado: false, estado: 'vacio', error: '' };
 
 function vistaControl() {
   const c = CONTROL.res;
   let h = '<div class="card"><div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">' +
-    '<div style="flex:1;min-width:220px"><h3>Control de leads de la tarde</h3><div class="sub" style="margin-bottom:0">Exportá de Vtiger la vista "Control CX" y elegí el archivo. Solo cuentan tus 6 agentes.</div></div>' +
+    '<div style="flex:1;min-width:220px"><h3>Control de leads de la tarde</h3><div class="sub" style="margin-bottom:0">Exportá de Vtiger las vistas "CX Pendientes" y "CX Derivados" y elegí los dos archivos juntos. Solo cuentan tus 6 agentes.</div></div>' +
     '<div class="fld"><label for="ctlFecha">Día del control</label><input class="inp" type="date" id="ctlFecha" value="' + CONTROL.fecha + '" min="' + (RESP.primerMes ? RESP.primerMes + '-01' : '') + '"></div>' +
-    '<span class="btn pri file">Importar export de Vtiger<input type="file" accept=".csv,text/csv" id="ctlArchivo"></span></div>' +
-    '<p class="nota" id="ctlMsg" style="margin-top:8px">' + (CONTROL.archivo ? esc(CONTROL.archivo) + ' · ' + c.leidos + ' leads leídos · calculado a las ' + esc(c.ahora.slice(11)) : 'Todavía no importaste el archivo de hoy.') + '</p></div>';
+    '<span class="btn pri file">Importar exports de Vtiger<input type="file" accept=".csv,text/csv" id="ctlArchivo" multiple></span></div>' +
+    '</div>' + cartelControl();
   if (!c) return h;
 
   const eq = c.equipo;
@@ -638,14 +655,15 @@ function vistaControl() {
 function prepararControl() {
   $('ctlFecha').addEventListener('change', (ev) => {
     CONTROL.fecha = ev.target.value;
-    if (CONTROL.texto) leerControl(); else render();
+    if (CONTROL.textos.length) leerControl(); else render();
   });
   $('ctlArchivo').addEventListener('change', (ev) => {
-    const file = ev.target.files[0];
-    if (!file) return;
-    const lector = new FileReader();
-    lector.onload = () => { CONTROL.texto = lector.result; CONTROL.archivo = file.name; leerControl(); };
-    lector.readAsText(file, 'UTF-8');
+    // Se pueden elegir los dos archivos juntos (CX Pendientes y CX Derivados).
+    const files = Array.from(ev.target.files);
+    if (!files.length) return;
+    Promise.all(files.map((f) => new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = mal; r.readAsText(f, 'UTF-8'); })))
+      .then((textos) => { CONTROL.textos = [unirCsvs(textos)]; CONTROL.archivo = files.map((f) => f.name).join(' + '); leerControl(); })
+      .catch(() => toast('No se pudieron leer los archivos', true));
     ev.target.value = '';
   });
   document.querySelectorAll('[data-tarea]').forEach((seg) => seg.addEventListener('click', (ev) => {
@@ -663,24 +681,60 @@ function prepararControl() {
   if (g) g.addEventListener('click', guardarControl);
 }
 
+/** Junta varios CSV de Vtiger en uno (por nombre de columna) y saca los leads repetidos. */
+function unirCsvs(textos) {
+  if (textos.length === 1) return textos[0];
+  const partir = (texto) => {
+    if (texto.charCodeAt(0) === 0xFEFF) texto = texto.slice(1);
+    const filas = []; let fila = [], cur = '', q = false;
+    for (let i = 0; i < texto.length; i++) {
+      const ch = texto[i];
+      if (q) { if (ch === '"' && texto[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === ',') { fila.push(cur.trim()); cur = ''; }
+      else if (ch === '\n' || ch === '\r') { if (ch === '\r' && texto[i + 1] === '\n') i++; fila.push(cur.trim()); cur = ''; if (fila.some((c) => c !== '')) filas.push(fila); fila = []; }
+      else cur += ch;
+    }
+    fila.push(cur.trim()); if (fila.some((c) => c !== '')) filas.push(fila);
+    return filas;
+  };
+  const columnas = [], filas = [], vistos = {};
+  textos.forEach((t) => {
+    const f = partir(t);
+    const enc = f[0] || [];
+    enc.forEach((h) => { if (columnas.indexOf(h) < 0) columnas.push(h); });
+    const iNum = enc.findIndex((h) => sinTildes(h).replace(/[^a-z]/g, '') === 'numerolead');
+    f.slice(1).forEach((r) => {
+      const obj = {}; enc.forEach((h, i) => { obj[h] = r[i] || ''; });
+      const k = iNum >= 0 ? r[iNum] : null;
+      if (k && vistos[k] !== undefined) filas[vistos[k]] = obj; else { if (k) vistos[k] = filas.length; filas.push(obj); }
+    });
+  });
+  const q = (v) => '"' + String(v).replace(/"/g, '""') + '"';
+  return [columnas.map(q).join(',')].concat(filas.map((o) => columnas.map((c) => q(o[c] || '')).join(','))).join('\n');
+}
+
 function ahoraControl() {
   // Si el control es de hoy, el backend usa la hora actual; si es de otro día, se calcula al cierre (18:00).
   return CONTROL.fecha === hoyISO() ? undefined : CONTROL.fecha + ' 18:00';
 }
 
 async function leerControl() {
-  $('ctlMsg').textContent = 'Leyendo ' + CONTROL.archivo + '…';
+  CONTROL.estado = 'leyendo'; CONTROL.error = '';
+  render();
   try {
-    CONTROL.res = await apiPost('leerVtiger', { texto: CONTROL.texto, fecha: CONTROL.fecha, ahora: ahoraControl() });
+    CONTROL.res = await apiPost('leerVtiger', { texto: CONTROL.textos[0], fecha: CONTROL.fecha, ahora: ahoraControl() });
     CONTROL.guardado = false;
+    CONTROL.estado = 'importado';
     // Si ese día ya estaba guardado, se recupera la "Tarea al día" cargada.
     CONTROL.tareas = {};
     CONTROL.res.agentes.forEach((a) => { const d = leadExistente(CONTROL.fecha, a.nombre); if (d && (d.tarea === true || d.tarea === false)) CONTROL.tareas[a.nombre] = d.tarea; });
     render();
+    window.scrollTo(0, 0);
   } catch (e) {
     CONTROL.res = null;
+    CONTROL.estado = 'error'; CONTROL.error = 'No se pudo importar ' + CONTROL.archivo + ': ' + e.message;
     render();
-    toast('No se pudo leer el archivo: ' + e.message, true);
   }
 }
 
@@ -689,13 +743,36 @@ async function guardarControl() {
   if (faltan.length) { toast('Falta marcar "Tarea al día" de: ' + faltan.join(', '), true); return; }
   const btn = $('ctlGuardar');
   btn.disabled = true;
+  btn.textContent = 'Guardando…';
   try {
-    await apiPost('guardarControlLeads', { texto: CONTROL.texto, fecha: CONTROL.fecha, ahora: ahoraControl(), tareas: CONTROL.tareas });
+    await apiPost('guardarControlLeads', { texto: CONTROL.textos[0], fecha: CONTROL.fecha, ahora: ahoraControl(), tareas: CONTROL.tareas });
     CONTROL.guardado = true;
+    CONTROL.estado = 'guardado';
     MES = CONTROL.fecha.slice(0, 7);
     await refrescar();
-    toast('Control del ' + fechaCorta(CONTROL.fecha) + ' guardado');
-  } catch (e) { toast('No se guardó: ' + e.message, true); btn.disabled = false; }
+    window.scrollTo(0, 0);
+  } catch (e) {
+    CONTROL.estado = 'error'; CONTROL.error = 'No se guardó el control: ' + e.message + ' Lo importado sigue en pantalla, probá guardar de nuevo.';
+    render();
+    window.scrollTo(0, 0);
+  }
+}
+
+/** Cartel grande con el estado del control: qué pasó y cuál es el próximo paso. */
+function cartelControl() {
+  const c = CONTROL.res;
+  const caja = (tipo, icono, titulo, texto) =>
+    '<div class="aviso ' + tipo + '" role="status"><span class="aviso-i" aria-hidden="true">' + icono + '</span><div><b>' + titulo + '</b>' + (texto ? '<div>' + texto + '</div>' : '') + '</div></div>';
+  if (CONTROL.estado === 'leyendo') return caja('info', '⏳', 'Importando ' + esc(CONTROL.archivo) + '…', 'Esperá unos segundos, no cierres la página.');
+  if (CONTROL.estado === 'error') return caja('mal', '✗', 'Algo falló', esc(CONTROL.error));
+  if (CONTROL.estado === 'guardado' && c) return caja('bien', '✓', 'Guardado en la planilla', 'El control del ' + esc(fechaCorta(CONTROL.fecha)) + ' ya está en el puntaje de leads de los 6 agentes. Lo podés ver en la pestaña Ranking.');
+  if (c) {
+    const tuyos = c.agentes.reduce((s, a) => s + a.leads.length, 0);
+    const pagina = c.leidos === 20 ? '<div class="aviso-extra">⚠ El archivo trae exactamente 20 leads: parece una sola página de la lista de Vtiger y no la vista completa de tus agentes. Revisá el export antes de guardar.</div>' : '';
+    return caja('bien', '✓', 'Importado: ' + esc(CONTROL.archivo),
+      c.leidos + ' leads leídos · ' + tuyos + ' de tus agentes · calculado a las ' + esc(c.ahora.slice(11)) + '.<br><b>Falta un paso:</b> marcá "Tarea al día" de los 6 y tocá <b>Guardar control del día</b> (abajo de todo).' + pagina);
+  }
+  return caja('info', '1', 'Importá el export de Vtiger de hoy', 'Tocá <b>Importar exports de Vtiger</b> y elegí el archivo. Acá vas a ver si se importó bien.');
 }
 
 function copiarTexto(txt) {
