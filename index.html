@@ -327,19 +327,21 @@ function render() {
     esc(m.etiqueta) + (admin && !m.publicado ? ' · borrador' : '') + '</option>').join('');
   // Pestañas
   const tabs = [['ranking', 'Ranking'], ['especiales', 'Evaluación especial'], ['puntaje', 'Cómo se calcula']];
-  if (admin) tabs.push(['carga', 'Carga de datos']);
+  if (admin) { tabs.splice(1, 0, ['control', 'Control de leads']); tabs.push(['carga', 'Carga de datos']); }
   if (!tabs.some((t) => t[0] === TAB)) TAB = 'ranking';
   $('tabs').innerHTML = tabs.map((t) => '<button class="tab' + (t[0] === TAB ? ' on' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>').join('');
 
   let html = bannerAdmin();
-  if (!MES && TAB !== 'puntaje' && TAB !== 'carga') {
+  if (!MES && TAB !== 'puntaje' && TAB !== 'carga' && TAB !== 'control') {
     html += '<div class="vacio"><b>Todavía no hay meses publicados</b>Cuando el coordinador publique el mes, lo vas a ver acá.</div>';
   } else if (TAB === 'ranking') html += vistaRanking();
   else if (TAB === 'especiales') html += vistaEspeciales();
   else if (TAB === 'puntaje') html += vistaPuntaje();
   else if (TAB === 'carga') html += vistaCarga();
+  else if (TAB === 'control') html += vistaControl();
   $('main').innerHTML = html;
   if (TAB === 'carga') prepararCarga();
+  if (TAB === 'control') prepararControl();
   if (TAB === 'especiales' && admin) prepararEspeciales();
   $('pie').textContent = 'Datos: planilla de Google · ' + (admin ? 'modo admin' : 'modo equipo (solo lectura)') + (MODO_MOCK ? ' · BACKEND DE PRUEBA' : '');
 }
@@ -575,6 +577,137 @@ function vistaPuntaje() {
     'Actitud (30): ejemplar 30 · buena 15 · correcta pero pasiva 8 · mala 0.<br>% Post Ventas es informativo. No entran al ranking.</p>' +
     '<p class="nota" style="margin-top:8px">El TMO pesa poco a propósito: es higiene, no rendimiento. Un TMO menor a 1:30 se marca con <span class="alerta">⚠</span> pero no resta.</p></div>' +
     '</div>';
+}
+
+// ============================================================================
+// VISTA: CONTROL DE LEADS (solo admin)
+// Se importa el export de Vtiger de la tarde: el Apps Script calcula todo (acción leerVtiger)
+// y "Guardar control del día" lo pasa al puntaje de leads (acción guardarControlLeads).
+// ============================================================================
+const CONTROL = { fecha: hoyISO(), texto: '', archivo: '', res: null, tareas: {}, guardado: false };
+
+function vistaControl() {
+  const c = CONTROL.res;
+  let h = '<div class="card"><div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">' +
+    '<div style="flex:1;min-width:220px"><h3>Control de leads de la tarde</h3><div class="sub" style="margin-bottom:0">Exportá de Vtiger la vista "Control CX" y elegí el archivo. Solo cuentan tus 6 agentes.</div></div>' +
+    '<div class="fld"><label for="ctlFecha">Día del control</label><input class="inp" type="date" id="ctlFecha" value="' + CONTROL.fecha + '" min="' + (RESP.primerMes ? RESP.primerMes + '-01' : '') + '"></div>' +
+    '<span class="btn pri file">Importar export de Vtiger<input type="file" accept=".csv,text/csv" id="ctlArchivo"></span></div>' +
+    '<p class="nota" id="ctlMsg" style="margin-top:8px">' + (CONTROL.archivo ? esc(CONTROL.archivo) + ' · ' + c.leidos + ' leads leídos · calculado a las ' + esc(c.ahora.slice(11)) : 'Todavía no importaste el archivo de hoy.') + '</p></div>';
+  if (!c) return h;
+
+  const eq = c.equipo;
+  h += '<div class="tiles" style="margin-top:12px">' +
+    tile('Sin gestionar', String(eq.sinGestionar), '"Creada" o "Asignada a vendedor"', eq.sinGestionar ? 'c-rojo' : 'c-verde') +
+    tile('Ecommerce vencidos', String(eq.vencidos), 'más de 48 h hábiles', eq.vencidos ? 'c-amarillo' : 'c-verde') +
+    tile('En proceso', String(eq.enProceso), 'Ecommerce, menos de 48 h') +
+    tile('Derivados con error', String(eq.conErrores), 'sin comentario o mal derivado', eq.conErrores ? 'c-amarillo' : 'c-verde') +
+    tile('Al día', eq.alDia + ' de 6', 'agentes sin problemas', eq.alDia === 6 ? 'c-verde' : '') + '</div>';
+
+  h += '<div class="h-sec">Por agente</div><div class="card scroll"><table class="t"><thead><tr><th>Agente</th><th class="r">Sin gestionar</th><th class="r">Ecom. vencidos</th><th class="r">En proceso</th>' +
+    '<th class="r">Gestionados hoy</th><th class="r">Errores</th><th class="r">Puntaje del día</th><th>Tarea al día</th></tr></thead><tbody>' +
+    c.agentes.map((a) => {
+      const t = CONTROL.tareas[a.nombre];
+      return '<tr><td class="txt"><b>' + esc(a.nombre) + '</b></td>' +
+        '<td class="r ' + (a.sinGestionar ? 'c-rojo' : 'muted') + '">' + a.sinGestionar + '</td>' +
+        '<td class="r ' + (a.vencidos ? 'c-amarillo' : 'muted') + '">' + a.vencidos + '</td>' +
+        '<td class="r muted">' + a.enProceso + '</td>' +
+        '<td class="r">' + a.gestionadosHoy + '</td>' +
+        '<td class="r ' + (a.errores ? 'c-amarillo' : 'muted') + '">' + a.errores + '</td>' +
+        '<td class="r">' + (a.puntajeDia === null ? '<span class="muted">sin leads</span>' : '<b class="' + (a.puntajeDia >= 8 ? 'c-verde' : a.puntajeDia >= 6.6 ? 'c-amarillo' : 'c-rojo') + '">' + fmt(a.puntajeDia, 2) + '</b>/10') + '</td>' +
+        '<td><div class="seg" data-tarea="' + esc(a.nombre) + '" style="min-width:110px"><button type="button" class="si' + (t === true ? ' on' : '') + '" data-v="1">SI</button><button type="button" class="no' + (t === false ? ' on' : '') + '" data-v="0">NO</button></div></td></tr>';
+    }).join('') + '</tbody></table></div>';
+
+  const conProblemas = c.agentes.filter((a) => a.leads.some((l) => l.situacion !== 'ok'));
+  if (conProblemas.length) {
+    h += '<div class="h-sec">Leads a revisar y mensajes</div><div class="grid2">';
+    conProblemas.forEach((a) => {
+      const color = { sin_gestionar: 'c-rojo', vencido: 'c-amarillo', error: 'c-amarillo', en_proceso: 'muted' };
+      h += '<div class="card"><h3>' + esc(a.nombre) + '</h3><table class="t" style="margin:8px 0 12px"><tbody>' +
+        a.leads.filter((l) => l.situacion !== 'ok').map((l) => '<tr><td style="width:96px">' + esc(l.numero) + '</td><td class="txt"><b class="' + color[l.situacion] + '">' + esc(l.etiqueta) + '</b><br><span class="t2">' + esc(l.detalle) + '</span></td></tr>').join('') +
+        '</tbody></table><div class="prev" style="white-space:pre-wrap;font-family:var(--font);font-size:13px">' + esc(a.mensaje) + '</div>' +
+        '<div class="acciones" style="margin-top:8px"><button class="btn" data-copiar="' + esc(a.nombre) + '">Copiar mensaje</button></div></div>';
+    });
+    h += '</div>';
+  }
+
+  h += '<div class="card" style="margin-top:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn pri" id="ctlGuardar">Guardar control del día</button>' +
+    '<span class="nota">' + (CONTROL.guardado ? '✓ Guardado: los leads del ' + esc(fechaCorta(CONTROL.fecha)) + ' ya están en el puntaje.' : 'Marcá "Tarea al día" de los 6 y guardá: esto carga el puntaje de leads del ' + esc(fechaCorta(CONTROL.fecha)) + '.') + '</span></div>';
+  return h;
+}
+
+function prepararControl() {
+  $('ctlFecha').addEventListener('change', (ev) => {
+    CONTROL.fecha = ev.target.value;
+    if (CONTROL.texto) leerControl(); else render();
+  });
+  $('ctlArchivo').addEventListener('change', (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    const lector = new FileReader();
+    lector.onload = () => { CONTROL.texto = lector.result; CONTROL.archivo = file.name; leerControl(); };
+    lector.readAsText(file, 'UTF-8');
+    ev.target.value = '';
+  });
+  document.querySelectorAll('[data-tarea]').forEach((seg) => seg.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    CONTROL.tareas[seg.dataset.tarea] = b.dataset.v === '1';
+    CONTROL.guardado = false;
+    render();
+  }));
+  document.querySelectorAll('[data-copiar]').forEach((b) => b.addEventListener('click', () => {
+    const a = CONTROL.res.agentes.filter((x) => x.nombre === b.dataset.copiar)[0];
+    copiarTexto(a.mensaje);
+  }));
+  const g = $('ctlGuardar');
+  if (g) g.addEventListener('click', guardarControl);
+}
+
+function ahoraControl() {
+  // Si el control es de hoy, el backend usa la hora actual; si es de otro día, se calcula al cierre (18:00).
+  return CONTROL.fecha === hoyISO() ? undefined : CONTROL.fecha + ' 18:00';
+}
+
+async function leerControl() {
+  $('ctlMsg').textContent = 'Leyendo ' + CONTROL.archivo + '…';
+  try {
+    CONTROL.res = await apiPost('leerVtiger', { texto: CONTROL.texto, fecha: CONTROL.fecha, ahora: ahoraControl() });
+    CONTROL.guardado = false;
+    // Si ese día ya estaba guardado, se recupera la "Tarea al día" cargada.
+    CONTROL.tareas = {};
+    CONTROL.res.agentes.forEach((a) => { const d = leadExistente(CONTROL.fecha, a.nombre); if (d && (d.tarea === true || d.tarea === false)) CONTROL.tareas[a.nombre] = d.tarea; });
+    render();
+  } catch (e) {
+    CONTROL.res = null;
+    render();
+    toast('No se pudo leer el archivo: ' + e.message, true);
+  }
+}
+
+async function guardarControl() {
+  const faltan = CONTROL.res.agentes.filter((a) => CONTROL.tareas[a.nombre] === undefined).map((a) => a.nombre.split(' ')[0]);
+  if (faltan.length) { toast('Falta marcar "Tarea al día" de: ' + faltan.join(', '), true); return; }
+  const btn = $('ctlGuardar');
+  btn.disabled = true;
+  try {
+    await apiPost('guardarControlLeads', { texto: CONTROL.texto, fecha: CONTROL.fecha, ahora: ahoraControl(), tareas: CONTROL.tareas });
+    CONTROL.guardado = true;
+    MES = CONTROL.fecha.slice(0, 7);
+    await refrescar();
+    toast('Control del ' + fechaCorta(CONTROL.fecha) + ' guardado');
+  } catch (e) { toast('No se guardó: ' + e.message, true); btn.disabled = false; }
+}
+
+function copiarTexto(txt) {
+  const ok = () => toast('Mensaje copiado');
+  if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(txt).then(ok, () => copiarViejo(txt)); return; }
+  copiarViejo(txt);
+}
+function copiarViejo(txt) {
+  const t = document.createElement('textarea');
+  t.value = txt; document.body.appendChild(t); t.select();
+  try { document.execCommand('copy'); toast('Mensaje copiado'); } catch (e) { toast('No se pudo copiar', true); }
+  t.remove();
 }
 
 // ============================================================================
