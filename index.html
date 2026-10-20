@@ -6,7 +6,7 @@
 <title>Performance Contact Center — Grupo Fiancar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Press+Start+2P&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
 // ============================================================================
 // 🔗 URL DEL APPS SCRIPT — pegá acá la URL de la implementación (termina en /exec)
@@ -16,10 +16,12 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbwLUmmLIT116KaMRuTw50zJ
 </script>
 <style>
 :root {
-  --bg: #0a0a0f; --s1: #13131a; --s2: #1c1c26; --border: #252535; --border2: #30304a;
-  --text: #eeeef5; --text2: #9e9eba; --muted: #6b6b86; --accent: #7c5cfc; --accent-soft: rgba(124, 92, 252, .14);
-  --green: #22d47a; --yellow: #f5c842; --red: #ff3a5c;
-  --font: 'Space Grotesk', system-ui, sans-serif; --mono: 'DM Mono', ui-monospace, monospace;
+  --bg: #14171f; --s1: #1b1f29; --s2: #232835; --border: #2c3242; --border2: #384054;
+  --text: #dfe3ec; --text2: #9aa3b5; --muted: #6f788b; --accent: #6cc4d9; --accent-soft: rgba(108, 196, 217, .12); --accent-line: rgba(108, 196, 217, .45); --on-accent: #10141b;
+  --green: #7bd88f; --yellow: #e8c872; --red: #ef7a7a; --gold: #e8c872;
+  /* Un color por componente del puntaje (barras por bloques) */
+  --c-leads: #7bd88f; --c-pct: #6cc4d9; --c-own: #e8c872; --c-camp: #d98cc4; --c-tmo: #9b8cf0;
+  --font: 'Space Grotesk', system-ui, sans-serif; --mono: 'DM Mono', ui-monospace, monospace; --pixel: 'Press Start 2P', 'DM Mono', monospace;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { -webkit-text-size-adjust: 100%; }
@@ -36,16 +38,16 @@ button, input, select { font: inherit; color: inherit; }
 .top-in { max-width: 1280px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .brand { display: flex; flex-direction: column; margin-right: auto; min-width: 0; }
 .brand b { font-size: 15px; font-weight: 600; letter-spacing: .2px; }
-.brand span { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); }
+.brand span { font-family: var(--pixel); font-size: 8px; letter-spacing: 1px; text-transform: uppercase; color: var(--gold); margin-bottom: 4px; }
 .sel { background: var(--s2); border: 1px solid var(--border2); padding: 7px 10px; font-family: var(--mono); font-size: 12px; outline: none; border-radius: 0; }
 .sel:focus { border-color: var(--accent); }
 .chip { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; padding: 5px 8px; border: 1px solid var(--border2); color: var(--text2); white-space: nowrap; }
-.chip.admin { color: var(--accent); border-color: rgba(124, 92, 252, .45); background: var(--accent-soft); }
+.chip.admin { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
 .chip.warn { color: var(--yellow); border-color: rgba(245, 200, 66, .4); }
 .chip.err { color: var(--red); border-color: rgba(255, 58, 92, .4); }
 .btn { background: var(--s2); border: 1px solid var(--border2); padding: 7px 12px; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; }
 .btn:hover { border-color: var(--accent); }
-.btn.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.pri { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 .btn.pri:hover { opacity: .9; }
 .btn.peligro { color: var(--red); border-color: rgba(255, 58, 92, .35); }
 .btn:disabled { opacity: .5; cursor: wait; }
@@ -64,53 +66,66 @@ main { max-width: 1280px; margin: 0 auto; padding: 16px; }
 .aviso.bien .aviso-i { color: var(--green); }
 .aviso.mal { border-color: var(--red); background: rgba(255, 58, 92, .08); }
 .aviso.mal .aviso-i { color: var(--red); }
-.aviso.info { border-color: rgba(124, 92, 252, .5); background: var(--accent-soft); }
+.aviso.info { border-color: var(--accent-line); background: var(--accent-soft); }
 .aviso-extra { margin-top: 8px; color: var(--yellow); }
 .grilla td, .grilla th { padding: 6px 5px; }
 .grilla button.dia { background: none; border: 1px solid transparent; color: var(--text2); font-family: var(--mono); font-size: 11px; padding: 2px 4px; cursor: pointer; }
 .grilla button.dia:hover { border-color: var(--accent); color: var(--text); }
-.grilla button.dia.on { background: var(--accent); color: #fff; }
+.grilla button.dia.on { background: var(--accent); color: var(--on-accent); }
 .banner .grow { flex: 1; min-width: 200px; }
-.h-sec { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text2); margin: 18px 0 10px; display: flex; align-items: center; gap: 10px; }
-.h-sec::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.h-sec { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); margin: 20px 0 10px; display: flex; align-items: center; gap: 10px; }
+.h-sec::after { content: ''; flex: 1; height: 2px; background: var(--border); }
 
 /* ---------- Tiles */
 .tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-.tile { background: var(--s1); border: 1px solid var(--border); padding: 12px; min-width: 0; }
+.tile { background: var(--s1); border: 2px solid var(--border); padding: 12px; min-width: 0; }
 .tile .l { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); }
-.tile .v { font-size: 26px; font-weight: 700; line-height: 1.1; margin-top: 4px; font-family: var(--mono); }
+.tile .v { font-size: 17px; line-height: 1.3; margin-top: 8px; font-family: var(--pixel); }
 .tile .s { font-size: 11px; color: var(--muted); margin-top: 2px; }
-.semas { display: flex; gap: 10px; margin-top: 6px; font-family: var(--mono); font-size: 20px; font-weight: 600; }
-.semas span::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; background: currentColor; }
+.semas { display: flex; gap: 12px; margin-top: 8px; font-family: var(--pixel); font-size: 15px; }
+.semas span::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 5px; vertical-align: middle; background: currentColor; }
 
 /* ---------- Ranking */
-.rk { background: var(--s1); border: 1px solid var(--border); }
-.rk-row { display: grid; grid-template-columns: 44px minmax(170px, 1.5fr) repeat(5, minmax(84px, 1fr)) 96px; align-items: stretch; border-bottom: 1px solid var(--border); }
-.rk-row:last-child { border-bottom: none; }
+.rk { display: grid; gap: 6px; }
+.rk-row { display: grid; grid-template-columns: 44px minmax(210px, 1.6fr) repeat(5, minmax(84px, 1fr)) 104px; align-items: stretch; background: var(--s1); border: 2px solid var(--border); }
+.rk-head { background: none !important; border-color: transparent !important; }
+.rk-row.p1 { border-color: var(--gold); }
 .rk-row.body { cursor: pointer; }
 .rk-row.body:hover { background: var(--s2); }
 .rk-row > div { padding: 10px 8px; min-width: 0; }
 .rk-head > div { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); padding-top: 9px; padding-bottom: 9px; }
 .rk-head .max { color: var(--muted); }
-.pos { font-family: var(--mono); font-size: 18px; font-weight: 500; color: var(--text2); text-align: center; align-self: center; }
-.pos.p1 { color: var(--accent); }
+.pos { font-family: var(--pixel); font-size: 12px; color: var(--text2); text-align: center; align-self: center; }
+.pos.p1 { color: var(--gold); }
+.ag { display: flex; gap: 10px; align-items: center; }
+.ag > div { min-width: 0; }
 .ag b { display: block; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ag span { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cmp .n { font-family: var(--mono); font-size: 15px; font-weight: 500; }
 .cmp .n small { color: var(--muted); font-size: 10px; }
 .cmp .m { font-family: var(--mono); font-size: 10.5px; color: var(--text2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bar { height: 3px; background: var(--s2); margin-top: 5px; position: relative; }
-.bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); }
+/* Barras por bloques (estilo barra de vida) */
+.bloques { display: flex; gap: 2px; margin-top: 6px; }
+.bloques i { flex: 1; height: 7px; background: var(--s2); }
+.desg-row .bloques { margin: 0; }
+.desg-row .bloques i { height: 12px; }
+.avatar { display: block; flex: none; background: var(--s2); image-rendering: pixelated; }
+.exp { font-family: var(--pixel); font-size: 15px; }
+.exp-l { font-family: var(--pixel); font-size: 7px; color: var(--muted); margin-left: 4px; }
+.lvl { display: inline-block; font-family: var(--pixel); font-size: 8px; padding: 4px 6px; margin-top: 6px; border: 2px solid currentColor; letter-spacing: 1px; }
+.lvl-0 { color: var(--muted); } .lvl-1 { color: #ef9a7a; } .lvl-2 { color: #e8c872; } .lvl-3 { color: #7bd88f; } .lvl-4 { color: #6cc4d9; } .lvl-5 { color: #b9a4f5; }
+.lvl-dios { color: #fff1b8; background: rgba(232, 200, 114, .18); border-color: var(--gold); }
+
 .cmp .lbl { display: none; }
 .tot { text-align: right; align-self: center; }
-.tot .v { font-family: var(--mono); font-size: 22px; font-weight: 600; }
-.tot .sem { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.tot .v { font-family: var(--pixel); font-size: 15px; }
+.tot .sem { display: none; }
 .sindatos { color: var(--muted); }
 .alerta { color: var(--yellow); cursor: help; }
 
 /* ---------- Cards genéricas */
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.card { background: var(--s1); border: 1px solid var(--border); padding: 14px; min-width: 0; }
+.card { background: var(--s1); border: 2px solid var(--border); padding: 14px; min-width: 0; }
 .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
 .card .sub { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
 .kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 13px; }
@@ -125,18 +140,18 @@ table.t .r { text-align: right; }
 
 /* ---------- Ficha (modal) */
 .ov { position: fixed; inset: 0; background: rgba(5, 5, 10, .78); z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 32px 16px; overflow-y: auto; }
-.modal { background: var(--s1); border: 1px solid var(--border2); width: 100%; max-width: 860px; }
+.modal { background: var(--s1); border: 2px solid var(--border2); width: 100%; max-width: 860px; }
 .modal-h { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border-bottom: 1px solid var(--border); }
 .modal-h .grow { flex: 1; min-width: 0; }
 .modal-h h2 { font-size: 20px; font-weight: 600; }
 .modal-b { padding: 16px; }
-.big { font-family: var(--mono); font-size: 40px; font-weight: 600; line-height: 1; text-align: right; }
+.big { font-family: var(--pixel); font-size: 26px; line-height: 1.2; text-align: right; }
 .x { background: none; border: 1px solid var(--border2); width: 32px; height: 32px; cursor: pointer; font-size: 16px; color: var(--text2); flex: none; }
 .desg { display: grid; gap: 10px; }
 .desg-row { display: grid; grid-template-columns: 150px 1fr 70px; gap: 12px; align-items: center; }
 .desg-row .nm { font-size: 13px; }
 .desg-row .nm small { display: block; color: var(--muted); font-size: 11px; font-family: var(--mono); }
-.desg-row .bar { height: 8px; margin: 0; }
+
 .desg-row .pt { font-family: var(--mono); text-align: right; font-size: 15px; }
 .desg-row .pt small { color: var(--muted); font-size: 11px; }
 .tmo-ch { display: grid; gap: 6px; }
@@ -196,7 +211,7 @@ table.t .r { text-align: right; }
   .cmp .n { font-size: 14px; }
   .cmp .m { font-size: 9.5px; }
   .desg-row { grid-template-columns: 1fr 60px; }
-  .desg-row .bar { grid-column: span 2; order: 3; }
+  .desg-row .bloques { grid-column: span 2; order: 3; }
   .tmo-r { grid-template-columns: 84px 1fr 42px; }
   .f-row { grid-template-columns: 1fr 1fr; }
   .ov { padding: 0; }
@@ -410,7 +425,7 @@ function vistaRanking() {
   h += '<div class="h-sec">Ranking</div><div class="rk">';
   h += '<div class="rk-row rk-head"><div>#</div><div>Agente</div>' +
     ['Leads|30', '% Atend.|25', 'Ownership|20', 'Campañas|15', 'TMO|10'].map((x) => { const p = x.split('|'); return '<div>' + p[0] + ' <span class="max">/' + p[1] + '</span></div>'; }).join('') +
-    '<div style="text-align:right">Total</div></div>';
+    '<div style="text-align:right">EXP · LVL</div></div>';
   dm.agentes.forEach((a) => { h += filaRanking(a); });
   h += '</div>';
   h += '<p class="nota" style="margin-top:8px">Tocá un agente para ver su ficha. <span class="alerta">⚠</span> = TMO menor a 1:30 (solo alerta, no resta puntos).</p>';
@@ -418,13 +433,78 @@ function vistaRanking() {
   return h;
 }
 
+// ============================================================================
+// ESTILO VIDEOJUEGO: avatares pixelados, barras por bloques, EXP y nivel
+// ============================================================================
+const COLOR_CMP = { leads: 'var(--c-leads)', pct: 'var(--c-pct)', own: 'var(--c-own)', camp: 'var(--c-camp)', tmo: 'var(--c-tmo)' };
+
+/** Nivel según la EXP (el puntaje total sobre 100). */
+function nivel(exp) {
+  if (exp === null || exp === undefined) return { txt: 'LVL —', cls: 'lvl-0' };
+  if (exp >= 100) return { txt: 'LVL DIOS', cls: 'lvl-dios' };
+  if (exp >= 90) return { txt: 'LVL 5', cls: 'lvl-5' };
+  if (exp >= 85) return { txt: 'LVL 4', cls: 'lvl-4' };
+  if (exp >= 80) return { txt: 'LVL 3', cls: 'lvl-3' };
+  if (exp >= 75) return { txt: 'LVL 2', cls: 'lvl-2' };
+  if (exp >= 65) return { txt: 'LVL 1', cls: 'lvl-1' };
+  return { txt: 'LVL 0', cls: 'lvl-0' };
+}
+function lvlHtml(exp) { const n = nivel(exp); return '<span class="lvl ' + n.cls + '" title="Nivel según la EXP: 65 LVL 1 · 75 LVL 2 · 80 LVL 3 · 85 LVL 4 · 90 LVL 5 · 100 LVL DIOS">' + n.txt + '</span>'; }
+
+/** Barra de 10 bloques, del color del componente. */
+function bloques(pts, max, color) {
+  const on = Math.max(0, Math.min(10, Math.round((pts || 0) / max * 10)));
+  let h = '<div class="bloques" aria-hidden="true">';
+  for (let i = 0; i < 10; i++) h += '<i' + (i < on ? ' style="background:' + color + '"' : '') + '></i>';
+  return h + '</div>';
+}
+
+// Rasgos de cada avatar (pelo: corto / larguito / largo; barba; lentes).
+const AVATARES = {
+  'Alvaro Cuello':    { pelo: '#6b4423', largo: 'corto', barba: true,  remera: '#3fa66b' },
+  'Melanie Barrero':  { pelo: '#17171c', largo: 'largo', piel: '#f6dcc7', remera: '#4f8fd9' },
+  'Damian Chmiel':    { pelo: '#17171c', largo: 'larguito', remera: '#d98a3f' },
+  'Sabrina Lapaz':    { pelo: '#17171c', largo: 'largo', lentes: true, remera: '#d9566b' },
+  'Gianine Pereda':   { pelo: '#4a2e1f', largo: 'largo', lentes: true, remera: '#3fb5a6' },
+  'Natasha Piriz':    { pelo: '#8b5a3c', largo: 'largo', remera: '#9b6bd9' },
+  'Piero Paganini':   { pelo: '#2b2420', largo: 'corto', remera: '#5a7fa6' },
+  'Shoanna Silveira': { pelo: '#3a2418', largo: 'largo', remera: '#c97ab0' }
+};
+
+/** Avatar pixelado de 12×12 dibujado en SVG (sin imágenes externas). */
+function avatar(nombre, tam) {
+  const a = AVATARES[nombre] || { pelo: '#3a3a44', largo: 'corto', remera: '#5a6478' };
+  const piel = a.piel || '#e3b58f', ojo = '#1b1b24', p = [];
+  const px = (x, y, c) => p.push('<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + c + '"/>');
+  // pelo largo: por detrás de la cara
+  if (a.largo === 'largo') for (let y = 3; y < 10; y++) { px(2, y, a.pelo); px(9, y, a.pelo); }
+  // cara
+  for (let x = 3; x < 9; x++) for (let y = 3; y < 8; y++) px(x, y, piel);
+  // pelo de arriba
+  for (let x = 3; x < 9; x++) px(x, 1, a.pelo);
+  for (let x = 2; x < 10; x++) px(x, 2, a.pelo);
+  px(2, 3, a.pelo); px(9, 3, a.pelo);
+  if (a.largo === 'larguito') for (let y = 3; y < 7; y++) { px(2, y, a.pelo); px(9, y, a.pelo); }
+  if (a.largo !== 'corto') { px(3, 3, a.pelo); px(8, 3, a.pelo); }
+  // ojos o lentes
+  if (a.lentes) { ['#2a2a35', '#a9d6e5', '#2a2a35', '#2a2a35', '#a9d6e5', '#2a2a35'].forEach((c, i) => px(3 + i, 5, c)); }
+  else { px(4, 5, ojo); px(7, 5, ojo); }
+  // boca y barba
+  if (a.barba) { for (let x = 3; x < 9; x++) px(x, 7, a.pelo); px(3, 6, a.pelo); px(8, 6, a.pelo); px(5, 7, '#b5705c'); px(6, 7, '#b5705c'); }
+  else { px(5, 7, '#c9806b'); px(6, 7, '#c9806b'); }
+  // cuello y remera
+  for (let x = 5; x < 7; x++) px(x, 8, piel);
+  for (let x = 2; x < 10; x++) for (let y = 9; y < 12; y++) px(x, y, a.remera);
+  return '<svg class="avatar" viewBox="0 0 12 12" width="' + (tam || 40) + '" height="' + (tam || 40) + '" shape-rendering="crispEdges" role="img" aria-label="Avatar de ' + esc(nombre) + '">' + p.join('') + '</svg>';
+}
+
 function tile(l, v, s, cls) {
   return '<div class="tile"><div class="l">' + l + '</div><div class="v ' + (cls || '') + '">' + v + '</div><div class="s">' + s + '</div></div>';
 }
 
-function cmp(lbl, pts, max, metrica, sinDatos) {
+function cmp(lbl, pts, max, metrica, sinDatos, color) {
   return '<div class="cmp"><span class="lbl">' + lbl + '</span><div class="n' + (sinDatos ? ' sindatos' : '') + '">' + fmt(pts) + '</div>' +
-    '<div class="m">' + metrica + '</div><div class="bar"><i style="width:' + Math.max(0, Math.min(100, pts / max * 100)) + '%"></i></div></div>';
+    '<div class="m">' + metrica + '</div>' + bloques(pts, max, color || 'var(--accent)') + '</div>';
 }
 
 function filaRanking(a) {
@@ -434,17 +514,17 @@ function filaRanking(a) {
   const mOwn = O.sinDatos ? 'sin datos' : O.diasAlDia + '/' + O.diasCargados + ' días';
   const mCamp = K.recepcion ? 'Recepción' : K.ganadas + ' gan. · ' + K.puesto + '°';
   const mTmo = C.tmo === null ? 'sin datos' : C.tmoTxt + (C.alertaTmo ? ' <span class="alerta" title="TMO menor a 1:30">⚠</span>' : '');
-  return '<div class="rk-row body" data-ficha="' + esc(a.nombre) + '">' +
+  return '<div class="rk-row body' + (a.puesto === 1 ? ' p1' : '') + '" data-ficha="' + esc(a.nombre) + '">' +
     '<div class="pos' + (a.puesto === 1 ? ' p1' : '') + '">' + a.puesto + '</div>' +
-    '<div class="ag"><b>' + esc(a.nombre) + '</b><span>' + a.ext + ' · ' + esc(a.tarea) + '</span></div>' +
+    '<div class="ag">' + avatar(a.nombre, 42) + '<div><b>' + esc(a.nombre) + '</b><span>' + a.ext + ' · ' + esc(a.tarea) + '</span></div></div>' +
     '<div class="cmps">' +
-    cmp('Leads', L.pts, MAX.leads, mLeads, L.sinDatos) +
-    cmp('% Atend', C.ptsPct, MAX.pct, mPct, C.pct === null) +
-    cmp('Owner', O.pts, MAX.own, mOwn, O.sinDatos) +
-    cmp('Camp.', K.pts, MAX.camp, mCamp, false) +
-    cmp('TMO', C.ptsTmo, MAX.tmo, mTmo, C.tmo === null) +
+    cmp('Leads', L.pts, MAX.leads, mLeads, L.sinDatos, COLOR_CMP.leads) +
+    cmp('% Atend', C.ptsPct, MAX.pct, mPct, C.pct === null, COLOR_CMP.pct) +
+    cmp('Owner', O.pts, MAX.own, mOwn, O.sinDatos, COLOR_CMP.own) +
+    cmp('Camp.', K.pts, MAX.camp, mCamp, false, COLOR_CMP.camp) +
+    cmp('TMO', C.ptsTmo, MAX.tmo, mTmo, C.tmo === null, COLOR_CMP.tmo) +
     '</div>' +
-    '<div class="tot"><span class="sem bg-' + a.semaforo + '"></span><span class="v c-' + a.semaforo + '">' + fmt(a.total) + '</span></div>' +
+    '<div class="tot"><span class="exp c-' + a.semaforo + '">' + fmt(a.total) + '</span><span class="exp-l">EXP</span><br>' + lvlHtml(a.total) + '</div>' +
     '</div>';
 }
 // ============================================================================
@@ -456,19 +536,19 @@ function abrirFicha(nombre) {
   if (!a) return;
   const L = a.leads, O = a.ownership, C = a.llamadas, K = a.campanas;
   let h = '<div class="ov" data-cerrar="1"><div class="modal" role="dialog" aria-label="Ficha de ' + esc(a.nombre) + '">';
-  h += '<div class="modal-h"><div class="grow"><h2>' + esc(a.nombre) + '</h2><div class="t2" style="font-size:12px">' + a.ext + ' · ' + esc(a.tarea) + ' · ' + esc(mesInfo(MES).etiqueta) + '</div>' +
+  h += '<div class="modal-h">' + avatar(a.nombre, 72) + '<div class="grow"><h2>' + esc(a.nombre) + '</h2><div class="t2" style="font-size:12px">' + a.ext + ' · ' + esc(a.tarea) + ' · ' + esc(mesInfo(MES).etiqueta) + '</div>' +
     '<div class="mono muted" style="font-size:11px;margin-top:4px">Puesto ' + a.puesto + ' de ' + dm.agentes.length + '</div></div>' +
-    '<div><div class="big c-' + a.semaforo + '">' + fmt(a.total) + '</div><div class="mono muted" style="font-size:10px;text-align:right">/ 100</div></div>' +
+    '<div style="text-align:right"><div class="big c-' + a.semaforo + '">' + fmt(a.total) + '</div><div class="exp-l" style="margin:0">EXP / 100</div>' + lvlHtml(a.total) + '</div>' +
     '<button class="x" data-cerrar="1" aria-label="Cerrar">✕</button></div>';
   h += '<div class="modal-b">';
 
   // Desglose
   h += '<div class="h-sec" style="margin-top:0">Desglose del puntaje</div><div class="desg">';
-  h += desg('Leads', L.sinDatos ? 'sin datos' : 'promedio ' + fmt(L.promedio, 2) + '/10 × 3', L.pts, MAX.leads);
-  h += desg('% Llamadas atendidas', C.pct === null ? 'sin datos' : fmt(C.pct) + '% · objetivo 90%', C.ptsPct, MAX.pct);
-  h += desg('Tarea asignada', O.sinDatos ? 'sin datos' : O.diasAlDia + ' de ' + O.diasCargados + ' días al día (' + fmt(O.pct) + '%)', O.pts, MAX.own);
-  h += desg('Campañas', K.recepcion ? 'Recepción · puntos fijos' : K.ganadas + ' ganadas · ' + K.puesto + '° del equipo', K.pts, MAX.camp);
-  h += desg('TMO', C.tmo === null ? 'sin datos' : C.tmoTxt + ' · objetivo 2:45', C.ptsTmo, MAX.tmo);
+  h += desg('Leads', L.sinDatos ? 'sin datos' : 'promedio ' + fmt(L.promedio, 2) + '/10 × 3', L.pts, MAX.leads, COLOR_CMP.leads);
+  h += desg('% Llamadas atendidas', C.pct === null ? 'sin datos' : fmt(C.pct) + '% · objetivo 90%', C.ptsPct, MAX.pct, COLOR_CMP.pct);
+  h += desg('Tarea asignada', O.sinDatos ? 'sin datos' : O.diasAlDia + ' de ' + O.diasCargados + ' días al día (' + fmt(O.pct) + '%)', O.pts, MAX.own, COLOR_CMP.own);
+  h += desg('Campañas', K.recepcion ? 'Recepción · puntos fijos' : K.ganadas + ' ganadas · ' + K.puesto + '° del equipo', K.pts, MAX.camp, COLOR_CMP.camp);
+  h += desg('TMO', C.tmo === null ? 'sin datos' : C.tmoTxt + ' · objetivo 2:45', C.ptsTmo, MAX.tmo, COLOR_CMP.tmo);
   h += '</div>';
 
   // Métricas
@@ -503,9 +583,9 @@ function abrirFicha(nombre) {
 
 function cerrarFicha() { $('capaModal').innerHTML = ''; document.body.style.overflow = ''; }
 
-function desg(nombre, detalle, pts, max) {
+function desg(nombre, detalle, pts, max, color) {
   return '<div class="desg-row"><div class="nm">' + nombre + '<small>' + detalle + '</small></div>' +
-    '<div class="bar"><i style="width:' + Math.min(100, pts / max * 100) + '%"></i></div>' +
+    bloques(pts, max, color || 'var(--accent)') +
     '<div class="pt">' + fmt(pts) + '<small>/' + max + '</small></div></div>';
 }
 
@@ -536,14 +616,14 @@ function vistaEspeciales() {
   const admin = esAdmin();
   let h = '<div id="vistaMes"><div class="banner"><span class="grow"><b>Evaluación especial · ' + esc(info.etiqueta) + '.</b> Piero y Shoanna tienen su propia rúbrica: no entran al ranking ni a los promedios del equipo.</span></div><div class="grid2">';
   dm.especiales.forEach((s) => {
-    h += '<div class="card"><div style="display:flex;justify-content:space-between;gap:10px"><div><h3>' + esc(s.nombre) + '</h3><div class="sub">' + s.ext + ' · ' + esc(s.tarea) + '</div></div>' +
-      '<div><div class="big ' + (s.semaforo ? 'c-' + s.semaforo : 'muted') + '" style="font-size:32px">' + (s.sinDatos ? '—' : s.total) + '</div><div class="mono muted" style="font-size:10px;text-align:right">/ 100</div></div></div>';
+    h += '<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div style="display:flex;gap:10px;align-items:center">' + avatar(s.nombre, 48) + '<div><h3>' + esc(s.nombre) + '</h3><div class="sub" style="margin-bottom:0">' + s.ext + ' · ' + esc(s.tarea) + '</div></div></div>' +
+      '<div style="text-align:right"><div class="big ' + (s.semaforo ? 'c-' + s.semaforo : 'muted') + '" style="font-size:20px">' + (s.sinDatos ? '—' : s.total) + '</div><div class="exp-l" style="margin:0">EXP / 100</div>' + (s.sinDatos ? '' : lvlHtml(s.total)) + '</div></div><div style="height:12px"></div>';
     if (s.sinDatos) h += '<p class="nota">Sin datos cargados para este mes.</p>';
     else {
       h += '<div class="desg">' +
-        desg('Encuestas', s.encuestas === null ? 'sin dato' : fmt(s.encuestas) + '% de satisfacción', s.ptsEncuestas, 50) +
-        desg('Tareas / redes / wpp', s.estado || 'sin dato', s.ptsEstado, 20) +
-        desg('Actitud', s.actitud || 'sin dato', s.ptsActitud, 30) + '</div>' +
+        desg('Encuestas', s.encuestas === null ? 'sin dato' : fmt(s.encuestas) + '% de satisfacción', s.ptsEncuestas, 50, COLOR_CMP.pct) +
+        desg('Tareas / redes / wpp', s.estado || 'sin dato', s.ptsEstado, 20, COLOR_CMP.own) +
+        desg('Actitud', s.actitud || 'sin dato', s.ptsActitud, 30, COLOR_CMP.camp) + '</div>' +
         '<div class="kv" style="margin-top:12px"><span class="k">% Post Ventas (informativo, no suma)</span><span class="v">' + (s.postVentas === null ? '—' : fmt(s.postVentas) + '%') + '</span></div>';
     }
     if (admin) h += formEspecial(s);
@@ -593,6 +673,7 @@ function vistaPuntaje() {
     tabla('Tarea asignada (20) · días al día ÷ días cargados', [['100%', 20], ['90 – 99%', 18], ['80 – 89%', 15], ['70 – 79%', 12], ['60 – 69%', 8], ['&lt; 60%', 4]]) +
     tabla('Campañas ganadas (15)', [['10 o más', 15], ['7 – 9', 12], ['5 – 6', 9], ['3 – 4', 6], ['1 – 2', 3], ['0', 0], ['Natasha (recepción)', 15]]) +
     tabla('TMO (10) · objetivo 2:45', [['≤ 2:45', 10], ['2:46 – 3:00', 8], ['3:01 – 3:15', 6], ['3:16 – 3:30', 4], ['&gt; 3:30', 2]]) +
+    tabla('Nivel según la EXP (puntaje total)', [['100', lvlHtml(100)], ['90 – 99', lvlHtml(90)], ['85 – 89', lvlHtml(85)], ['80 – 84', lvlHtml(80)], ['75 – 79', lvlHtml(75)], ['65 – 74', lvlHtml(65)], ['menos de 65', lvlHtml(0)]]) +
     '<div class="card"><h3>Evaluación especial (Piero y Shoanna)</h3><p class="nota" style="margin-top:6px">Encuestas (50): ≥90% 50 · 85–89 32 · 80–84 24 · 70–79 12 · &lt;70 0.<br>' +
     'Tareas/redes/wpp (20): siempre al día 20 · 1–2 desbordes leves 15 · atrasos recurrentes 8 · desorden constante 0.<br>' +
     'Actitud (30): ejemplar 30 · buena 15 · correcta pero pasiva 8 · mala 0.<br>% Post Ventas es informativo. No entran al ranking.</p>' +
@@ -628,7 +709,7 @@ function vistaControl() {
     '<th class="r">Gestionados hoy</th><th class="r">Errores</th><th class="r">Puntaje del día</th><th>Tarea al día</th></tr></thead><tbody>' +
     c.agentes.map((a) => {
       const t = CONTROL.tareas[a.nombre];
-      return '<tr><td class="txt"><b>' + esc(a.nombre) + '</b></td>' +
+      return '<tr><td class="txt"><div style="display:flex;gap:8px;align-items:center">' + avatar(a.nombre, 26) + '<b>' + esc(a.nombre) + '</b></div></td>' +
         '<td class="r ' + (a.sinGestionar ? 'c-rojo' : 'muted') + '">' + a.sinGestionar + '</td>' +
         '<td class="r ' + (a.vencidos ? 'c-amarillo' : 'muted') + '">' + a.vencidos + '</td>' +
         '<td class="r muted">' + a.enProceso + '</td>' +
@@ -1229,7 +1310,7 @@ async function exportarPng() {
       v.style.padding = '20px'; v.style.width = '1240px';
       v.querySelectorAll('button, .no-png').forEach((b) => b.remove());
       const t = doc.createElement('div');
-      t.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:11px;letter-spacing:2px;color:#7c5cfc;text-transform:uppercase">Grupo Fiancar · Performance Contact Center</div>' +
+      t.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:11px;letter-spacing:2px;color:#e8c872;text-transform:uppercase">Grupo Fiancar · Performance Contact Center</div>' +
         '<div style="font-size:22px;font-weight:600;margin:4px 0 14px">' + esc(mesInfo(MES).etiqueta) + (TAB === 'especiales' ? ' · Evaluación especial' : '') + '</div>';
       v.insertBefore(t, v.firstChild);
     } });
