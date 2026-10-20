@@ -794,7 +794,14 @@ function prepararControl() {
     const files = Array.from(ev.target.files);
     if (!files.length) return;
     Promise.all(files.map((f) => new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = mal; r.readAsText(f, 'UTF-8'); })))
-      .then((textos) => { CONTROL.textos = [unirCsvs(textos)]; CONTROL.archivo = files.map((f) => f.name).join(' + '); leerControl(); })
+      .then((textos) => {
+        CONTROL.textos = [unirCsvs(textos)]; CONTROL.archivo = files.map((f) => f.name).join(' + ');
+        // Export de la lista: el día sale del archivo (fecha de creación). Si casi todos los leads son de un mismo día, se usa ese.
+        const dias = CONTROL.formato.dias, total = Object.keys(dias).reduce((s, k) => s + dias[k], 0);
+        const top = Object.keys(dias).sort((x, y) => dias[y] - dias[x])[0];
+        if (top && dias[top] >= total * 0.8 && top !== CONTROL.fecha && (!RESP.primerMes || top.slice(0, 7) >= RESP.primerMes)) { CONTROL.formato.fechaAuto = CONTROL.fecha; CONTROL.fecha = top; }
+        leerControl();
+      })
       .catch(() => toast('No se pudieron leer los archivos', true));
     ev.target.value = '';
   });
@@ -850,6 +857,8 @@ function adaptarFilaLista(o, info) {
   if ('Fecha de Asignado' in o && 'Fecha de Modificación' in o) return o;
   info.formatoLista = true;
   const creacion = fechaVtigerISO(o['Fecha de Creación']);
+  const dia = String(creacion).slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dia)) info.dias[dia] = (info.dias[dia] || 0) + 1;
   o['Fecha de Creación'] = creacion;
   o['Asignado a'] = usuarioVtiger(o['Asignado a']);
   // Sin fechas de asignación/modificación: el día de referencia es el de creación del lead.
@@ -862,7 +871,7 @@ function adaptarFilaLista(o, info) {
 
 /** Junta varios CSV de Vtiger en uno (por nombre de columna), saca los leads repetidos y adapta el export de la lista. */
 function unirCsvs(textos) {
-  CONTROL.formato = { formatoLista: false, sinComentarios: false };
+  CONTROL.formato = { formatoLista: false, sinComentarios: false, dias: {}, fechaAuto: '' };
   const partir = (texto) => {
     if (texto.charCodeAt(0) === 0xFEFF) texto = texto.slice(1);
     // Archivo guardado con la codificación equivocada ("CreaciÃ³n"): se corrige.
@@ -971,7 +980,10 @@ function cartelControl() {
     const fmtLista = CONTROL.formato && CONTROL.formato.formatoLista
       ? '<div class="aviso-extra">ⓘ Es el export de la lista (solo columnas visibles): el día se toma por la <b>fecha de creación</b> del lead' +
         (CONTROL.formato.sinComentarios ? ' y <b>no se controlan los comentarios</b> (el archivo no trae "Fecha último comentario")' : '') + '.</div>' : '';
-    const pagina = fmtLista + (c.leidos === 20 ?'<div class="aviso-extra">⚠ El archivo trae exactamente 20 leads: parece una sola página de la lista de Vtiger y no la vista completa de tus agentes. Revisá el export antes de guardar.</div>' : '');
+    const diasArch = CONTROL.formato ? Object.keys(CONTROL.formato.dias || {}).sort() : [];
+    const varios = diasArch.length > 1 && !(CONTROL.formato.fechaAuto) ? '<div class="aviso-extra">⚠ El archivo trae leads de ' + diasArch.length + ' días (' + esc(fechaCorta(diasArch[0])) + ' al ' + esc(fechaCorta(diasArch[diasArch.length - 1])) + '). Esto muestra solo el <b>' + esc(fechaCorta(CONTROL.fecha)) + '</b>: para otro día, tocalo en la grilla de abajo y volvé a importar.</div>' : '';
+    const auto = varios + (CONTROL.formato && CONTROL.formato.fechaAuto ?'<div class="aviso-extra" style="color:var(--accent)">ⓘ Día del control: <b>' + esc(fechaCorta(CONTROL.fecha)) + '</b>, tomado del archivo (sus leads son de ese día).</div>' : '');
+    const pagina = auto + fmtLista + (c.leidos === 20 ?'<div class="aviso-extra">⚠ El archivo trae exactamente 20 leads: parece una sola página de la lista de Vtiger y no la vista completa de tus agentes. Revisá el export antes de guardar.</div>' : '');
     return caja('bien', '✓', 'Importado: ' + esc(CONTROL.archivo),
       c.leidos + ' leads leídos · ' + tuyos + ' de tus agentes · calculado a las ' + esc(c.ahora.slice(11)) + '.<br><b>Falta un paso:</b> marcá "Tarea al día" de los 6 y tocá <b>Guardar control del día</b> (abajo de todo).' + pagina);
   }
