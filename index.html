@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Performance Contact Center — Grupo Fiancar</title>
+<title>Liga CX — Grupo Fiancar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Press+Start+2P&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -38,6 +38,8 @@ button, input, select { font: inherit; color: inherit; }
 .top-in { max-width: 1280px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .brand { display: flex; flex-direction: column; margin-right: auto; min-width: 0; }
 .brand b { font-size: 15px; font-weight: 600; letter-spacing: .2px; }
+.brand .brand-liga { font-family: var(--pixel); font-size: 15px; font-weight: 400; color: var(--gold); letter-spacing: 1px; }
+.brand .brand-sub { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: var(--text2); text-transform: none; margin: 6px 0 0; }
 .brand span { font-family: var(--pixel); font-size: 8px; letter-spacing: 1px; text-transform: uppercase; color: var(--gold); margin-bottom: 4px; }
 .sel { background: var(--s2); border: 1px solid var(--border2); padding: 7px 10px; font-family: var(--mono); font-size: 12px; outline: none; border-radius: 0; }
 .sel:focus { border-color: var(--accent); }
@@ -225,7 +227,7 @@ table.t .r { text-align: right; }
 
 <header class="top">
   <div class="top-in">
-    <div class="brand"><span>Grupo Fiancar</span><b>Performance Contact Center</b></div>
+    <div class="brand"><b class="brand-liga">LIGA CX</b><span class="brand-sub">Performance Contact Center · Grupo Fiancar</span></div>
     <select class="sel" id="selMes" aria-label="Mes" hidden></select>
     <span class="chip" id="chipSync">Cargando…</span>
     <span class="chip admin" id="chipRol" hidden>Admin</span>
@@ -344,6 +346,8 @@ async function refrescar() {
 
 function elegirMes() {
   if (!RESP) return;
+  // Cada mes es una "misión": Octubre 2026 -> Misión Octubre 2026.
+  (RESP.meses || []).forEach((m) => { if (m.etiqueta && m.etiqueta.indexOf('Misión ') !== 0) m.etiqueta = 'Misión ' + m.etiqueta; });
   if (!MES || !RESP.datos[MES]) MES = RESP.mesMostrado || (RESP.meses[0] && RESP.meses[0].mes) || null;
 }
 
@@ -1004,7 +1008,7 @@ function mesDeCarga() {
 function etiquetaDe(mes) {
   const nombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const p = mes.split('-');
-  return nombres[Number(p[1]) - 1] + ' ' + p[0];
+  return 'Misión ' + nombres[Number(p[1]) - 1] + ' ' + p[0];
 }
 
 function vistaCarga() {
@@ -1021,7 +1025,7 @@ function vistaCarga() {
 
   // ---- Mes de carga
   h += '<div class="banner"><span class="grow"><b>Mes que estás cargando:</b> llamadas, campañas y días hábiles se guardan en este mes. ' +
-    (anterior ? '<span class="c-amarillo">El sistema arranca en ' + esc(etiquetaDe(RESP.primerMes)) + ': lo anterior no se carga.</span>' : info ? (info.publicado ? 'Publicado: el equipo lo ve.' : 'Borrador: el equipo todavía no lo ve.')
+    (anterior ? '<span class="c-amarillo">El sistema arranca en ' + esc(etiquetaDe(RESP.primerMes).replace('Misión ', '')) + ': lo anterior no se carga.</span>' : info ? (info.publicado ? 'Publicado: el equipo lo ve.' : 'Borrador: el equipo todavía no lo ve.')
       : 'Todavía no tiene datos: se crea con lo primero que guardes.') + '</span>' +
     '<input class="inp" type="month" id="mesCarga" value="' + mes + '" min="' + (RESP.primerMes || '') + '" style="width:auto" aria-label="Mes que estás cargando"></div>';
 
@@ -1045,7 +1049,7 @@ function vistaCarga() {
   // ---- Estado del mes
   h += '<div class="card"><h3>' + esc(etiqueta) + '</h3><div class="sub">Días hábiles, publicación y control de carga.</div>';
   if (anterior) {
-    h += '<p class="nota">El sistema arranca en ' + esc(etiquetaDe(RESP.primerMes)) + '. Elegí ese mes o uno posterior arriba.</p>';
+    h += '<p class="nota">El sistema arranca en ' + esc(etiquetaDe(RESP.primerMes).replace('Misión ', '')) + '. Elegí ese mes o uno posterior arriba.</p>';
   } else {
     h += '<form class="form" id="fMes"><div class="f-row" style="grid-template-columns:1fr auto"><div class="fld"><label for="mDias">Días hábiles</label>' +
       '<input class="inp" type="number" id="mDias" min="1" max="31" value="' + ((info && info.diasHabiles) || '') + '"></div>' +
@@ -1310,7 +1314,7 @@ async function exportarPng() {
       v.style.padding = '20px'; v.style.width = '1240px';
       v.querySelectorAll('button, .no-png').forEach((b) => b.remove());
       const t = doc.createElement('div');
-      t.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:11px;letter-spacing:2px;color:#e8c872;text-transform:uppercase">Grupo Fiancar · Performance Contact Center</div>' +
+      t.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:11px;letter-spacing:2px;color:#e8c872;text-transform:uppercase">Liga CX · Grupo Fiancar</div>' +
         '<div style="font-size:22px;font-weight:600;margin:4px 0 14px">' + esc(mesInfo(MES).etiqueta) + (TAB === 'especiales' ? ' · Evaluación especial' : '') + '</div>';
       v.insertBefore(t, v.firstChild);
     } });
