@@ -699,6 +699,7 @@ function vistaControl() {
     '<div class="fld"><label for="ctlFecha">Día del control</label><input class="inp" type="date" id="ctlFecha" value="' + CONTROL.fecha + '" min="' + (RESP.primerMes ? RESP.primerMes + '-01' : '') + '"></div>' +
     '<span class="btn pri file">Importar exports de Vtiger<input type="file" accept=".csv,text/csv" id="ctlArchivo" multiple></span></div>' +
     '</div>' + cartelControl();
+  if (CONTROL.multi && CONTROL.estado === 'multi') return h + vistaMulti() + grillaMesLeads();
   if (!c) return h + grillaMesLeads();
 
   const eq = c.equipo;
@@ -799,7 +800,7 @@ function prepararControl() {
         // Export de la lista: el día sale del archivo (fecha de creación). Si casi todos los leads son de un mismo día, se usa ese.
         const dias = CONTROL.formato.dias, total = Object.keys(dias).reduce((s, k) => s + dias[k], 0);
         const top = Object.keys(dias).sort((x, y) => dias[y] - dias[x])[0];
-        if (top && dias[top] >= total * 0.8 && top !== CONTROL.fecha && (!RESP.primerMes || top.slice(0, 7) >= RESP.primerMes)) { CONTROL.formato.fechaAuto = CONTROL.fecha; CONTROL.fecha = top; }
+        if (top && dias[top] >= total * 0.8 && diasHabilesDelArchivo().length <= 1 && top !== CONTROL.fecha && (!RESP.primerMes || top.slice(0, 7) >= RESP.primerMes)) { CONTROL.formato.fechaAuto = CONTROL.fecha; CONTROL.fecha = top; }
         leerControl();
       })
       .catch(() => toast('No se pudieron leer los archivos', true));
@@ -818,6 +819,8 @@ function prepararControl() {
   }));
   const g = $('ctlGuardar');
   if (g) g.addEventListener('click', guardarControl);
+  const gm = $('ctlGuardarMulti');
+  if (gm) gm.addEventListener('click', guardarVariosDias);
   // Tocar un día de la grilla lo elige como "Día del control" (hay que importar el export de ese día).
   document.querySelectorAll('[data-dia]').forEach((b) => b.addEventListener('click', () => {
     if (b.dataset.dia === CONTROL.fecha) return;
@@ -859,6 +862,8 @@ function adaptarFilaLista(o, info) {
   const creacion = fechaVtigerISO(o['Fecha de Creación']);
   const dia = String(creacion).slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(dia)) info.dias[dia] = (info.dias[dia] || 0) + 1;
+  const cod = VT_AGENTES[sinTildes(o['Derivado por'])];
+  if (cod) info.derivan[NOMBRE_DE_CODIGO[cod]] = true;
   o['Fecha de Creación'] = creacion;
   o['Asignado a'] = usuarioVtiger(o['Asignado a']);
   // Sin fechas de asignación/modificación: el día de referencia es el de creación del lead.
@@ -871,7 +876,7 @@ function adaptarFilaLista(o, info) {
 
 /** Junta varios CSV de Vtiger en uno (por nombre de columna), saca los leads repetidos y adapta el export de la lista. */
 function unirCsvs(textos) {
-  CONTROL.formato = { formatoLista: false, sinComentarios: false, dias: {}, fechaAuto: '' };
+  CONTROL.formato = { formatoLista: false, sinComentarios: false, dias: {}, fechaAuto: '', derivan: {} };
   const partir = (texto) => {
     if (texto.charCodeAt(0) === 0xFEFF) texto = texto.slice(1);
     // Archivo guardado con la codificación equivocada ("CreaciÃ³n"): se corrige.
@@ -928,9 +933,88 @@ function ahoraControl() {
   return CONTROL.fecha === hoyISO() ? undefined : CONTROL.fecha + ' 18:00';
 }
 
+// ---- Varios días en los archivos (por ejemplo, "del 1 al 8"): se calcula y se guarda cada día hábil.
+const NOMBRE_DE_CODIGO = { alvcue: 'Alvaro Cuello', slapaz: 'Sabrina Lapaz', damchm: 'Damian Chmiel', melbar: 'Melanie Barrero', gpereda: 'Gianine Pereda', natpir: 'Natasha Piriz' };
+
+function diasHabilesDelArchivo() {
+  const dias = CONTROL.formato ? Object.keys(CONTROL.formato.dias || {}).sort() : [];
+  return dias.filter((d) => { const p = d.split('-').map(Number); const w = new Date(p[0], p[1] - 1, p[2]).getDay(); return w !== 0 && w !== 6 && (!RESP.primerMes || d.slice(0, 7) >= RESP.primerMes) && d <= hoyISO(); });
+}
+
+async function leerVariosDias(dias) {
+  CONTROL.multi = { dias: dias, res: {}, progreso: '' };
+  for (let i = 0; i < dias.length; i++) {
+    CONTROL.multi.progreso = 'Calculando ' + fechaCorta(dias[i]) + ' (' + (i + 1) + ' de ' + dias.length + ')…';
+    render();
+    CONTROL.multi.res[dias[i]] = await apiPost('leerVtiger', { texto: CONTROL.textos[0], fecha: dias[i], ahora: dias[i] + ' 18:00' });
+  }
+  CONTROL.multi.progreso = '';
+  CONTROL.estado = 'multi';
+}
+
+/** Agentes a guardar: los que aparecen en los archivos como "Derivado por" o "Asignado a". */
+function agentesDelArchivo() {
+  const set = {};
+  Object.keys(CONTROL.formato.derivan || {}).forEach((n) => { set[n] = true; });
+  return RESP.equipo.agentes.map((a) => a.nombre).filter((n) => set[n]);
+}
+
+function vistaMulti() {
+  const m = CONTROL.multi, ags = agentesDelArchivo();
+  let h = '<div class="h-sec">Resultado por día · se va a guardar</div><div class="card scroll"><table class="t grilla"><thead><tr><th>Agente</th>' +
+    m.dias.map((d) => '<th class="r">' + Number(d.slice(8)) + '/' + Number(d.slice(5, 7)) + '</th>').join('') + '</tr></thead><tbody>' +
+    RESP.equipo.agentes.map((ag) => {
+      const incluido = ags.indexOf(ag.nombre) >= 0;
+      return '<tr' + (incluido ? '' : ' class="muted"') + '><td class="txt"><div style="display:flex;gap:8px;align-items:center">' + avatar(ag.nombre, 24) + '<b>' + esc(ag.nombre) + '</b>' + (incluido ? '' : ' <span class="nota">(no está en los archivos: no se toca)</span>') + '</div></td>' +
+        m.dias.map((d) => {
+          const a = m.res[d].agentes.filter((x) => x.nombre === ag.nombre)[0];
+          if (!incluido) return '<td class="r muted">·</td>';
+          if (!a.totales) return '<td class="r muted" title="Sin leads ese día">s/l</td>';
+          const col = a.puntajeDia >= 8 ? 'c-verde' : a.puntajeDia >= 6.6 ? 'c-amarillo' : 'c-rojo';
+          return '<td class="r ' + col + '" title="' + a.totales + ' leads · ' + a.sinGestionarTotal + ' sin gestionar · ' + a.errores + ' errores">' + fmt(a.puntajeDia, 1) + '</td>';
+        }).join('') + '</tr>';
+    }).join('') + '</tbody></table></div>';
+  h += '<div class="card" style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn pri" id="ctlGuardarMulti">Guardar los ' + m.dias.length + ' días</button>' +
+    '<span class="nota">Reemplaza lo que hubiera en esos días para los agentes de los archivos. "Tarea al día": se mantiene lo cargado; donde no había nada queda SI (lo podés corregir en Carga de datos).</span></div>';
+  return h;
+}
+
+async function guardarVariosDias() {
+  const m = CONTROL.multi, ags = agentesDelArchivo();
+  const btn = $('ctlGuardarMulti');
+  btn.disabled = true;
+  const tareas = [];
+  m.dias.forEach((d) => ags.forEach((n) => {
+    const a = m.res[d].agentes.filter((x) => x.nombre === n)[0];
+    const prev = leadExistente(d, n);
+    tareas.push({ fecha: d, agente: n, totales: a.totales, sinGestionar: a.sinGestionarTotal, errores: a.errores,
+      tareaAlDia: prev && (prev.tarea === true || prev.tarea === false) ? prev.tarea : true });
+  }));
+  try {
+    for (let i = 0; i < tareas.length; i += 4) {
+      btn.textContent = 'Guardando ' + Math.min(i + 4, tareas.length) + ' de ' + tareas.length + '…';
+      await Promise.all(tareas.slice(i, i + 4).map((t) => apiPost('guardarLead', t)));
+    }
+    CONTROL.estado = 'guardado';
+    CONTROL.guardadoMulti = m.dias.length + ' días (' + fechaCorta(m.dias[0]) + ' al ' + fechaCorta(m.dias[m.dias.length - 1]) + ') de ' + ags.length + ' agentes';
+    MES = m.dias[0].slice(0, 7);
+    await refrescar();
+    window.scrollTo(0, 0);
+  } catch (e) {
+    CONTROL.estado = 'error'; CONTROL.error = 'No se guardaron todos los días: ' + e.message + ' Probá guardar de nuevo (lo ya guardado se reemplaza, no se duplica).';
+    render();
+  }
+}
+
 async function leerControl() {
-  CONTROL.estado = 'leyendo'; CONTROL.error = '';
+  CONTROL.estado = 'leyendo'; CONTROL.error = ''; CONTROL.multi = null; CONTROL.guardadoMulti = '';
   render();
+  const varios = diasHabilesDelArchivo();
+  if (varios.length > 1) {
+    try { await leerVariosDias(varios); render(); window.scrollTo(0, 0); }
+    catch (e) { CONTROL.multi = null; CONTROL.estado = 'error'; CONTROL.error = 'No se pudo importar ' + CONTROL.archivo + ': ' + e.message; render(); }
+    return;
+  }
   try {
     CONTROL.res = await apiPost('leerVtiger', { texto: CONTROL.textos[0], fecha: CONTROL.fecha, ahora: ahoraControl() });
     CONTROL.guardado = false;
@@ -972,7 +1056,9 @@ function cartelControl() {
   const c = CONTROL.res;
   const caja = (tipo, icono, titulo, texto) =>
     '<div class="aviso ' + tipo + '" role="status"><span class="aviso-i" aria-hidden="true">' + icono + '</span><div><b>' + titulo + '</b>' + (texto ? '<div>' + texto + '</div>' : '') + '</div></div>';
-  if (CONTROL.estado === 'leyendo') return caja('info', '⏳', 'Importando ' + esc(CONTROL.archivo) + '…', 'Esperá unos segundos, no cierres la página.');
+  if (CONTROL.estado === 'leyendo') return caja('info', '⏳', 'Importando ' + esc(CONTROL.archivo) + '…', (CONTROL.multi && CONTROL.multi.progreso ? esc(CONTROL.multi.progreso) + ' ' : '') + 'Esperá unos segundos, no cierres la página.');
+  if (CONTROL.estado === 'multi' && CONTROL.multi) { const d = CONTROL.multi.dias, ags = agentesDelArchivo(); return caja('bien', '✓', 'Importado: ' + esc(CONTROL.archivo), 'Trae <b>' + d.length + ' días hábiles</b> (' + esc(fechaCorta(d[0])) + ' al ' + esc(fechaCorta(d[d.length - 1])) + ') de <b>' + ags.length + ' agentes</b>: ' + esc(ags.map((n) => n.split(' ')[0]).join(', ')) + '.<br><b>Falta un paso:</b> revisá la tabla y tocá <b>Guardar los ' + d.length + ' días</b>.'); }
+  if (CONTROL.estado === 'guardado' && CONTROL.guardadoMulti) return caja('bien', '✓', 'Guardado en la planilla', 'Se guardaron ' + esc(CONTROL.guardadoMulti) + '. Ya está en el puntaje de leads: lo ves en la grilla de abajo y en el Ranking.');
   if (CONTROL.estado === 'error') return caja('mal', '✗', 'Algo falló', esc(CONTROL.error));
   if (CONTROL.estado === 'guardado' && c) return caja('bien', '✓', 'Guardado en la planilla', 'El control del ' + esc(fechaCorta(CONTROL.fecha)) + ' ya está en el puntaje de leads de los 6 agentes. Lo podés ver en la pestaña Ranking.');
   if (c) {
