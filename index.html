@@ -550,7 +550,7 @@ function abrirFicha(nombre) {
   // Desglose
   h += '<div class="h-sec" style="margin-top:0">Desglose del puntaje</div><div class="desg">';
   h += desg('Leads', L.sinDatos ? 'sin datos' : 'promedio ' + fmt(L.promedio, 2) + '/10 × 3', L.pts, MAX.leads, COLOR_CMP.leads);
-  h += desg('% Llamadas atendidas', C.pct === null ? 'sin datos' : fmt(C.pct) + '% · objetivo 90%', C.ptsPct, MAX.pct, COLOR_CMP.pct);
+  h += desg('% Llamadas atendidas', C.pct === null ? 'sin datos' : fmt(C.pct) + '% · objetivo ' + (C.objetivoPct || 90) + '%', C.ptsPct, MAX.pct, COLOR_CMP.pct);
   h += desg('Tarea asignada', O.sinDatos ? 'sin datos' : O.diasAlDia + ' de ' + O.diasCargados + ' días al día (' + fmt(O.pct) + '%)', O.pts, MAX.own, COLOR_CMP.own);
   h += desg('Campañas', K.recepcion ? 'Recepción · puntos fijos' : K.ganadas + ' ganadas con respaldo en 3CX · ' + K.puesto + '° del equipo' + (K.bonus ? ' · +' + K.bonus + ' por gestionar todas' : ''), K.pts, MAX.camp, COLOR_CMP.camp);
   h += desg('TMO', C.tmo === null ? 'sin datos' : C.tmoTxt + ' · objetivo 2:45', C.ptsTmo, MAX.tmo, COLOR_CMP.tmo);
@@ -675,6 +675,7 @@ function vistaPuntaje() {
     'El puntaje del mes es el promedio simple de los días × 3: cada día pesa igual, porque se mide la constancia.</p>' +
     '<p class="nota" style="margin-top:8px">Errores posibles: ' + (RESP ? RESP.equipo.erroresLead.map(esc).join(' · ') : '') + '.</p></div>' +
     tabla('% Llamadas atendidas (25) · objetivo 90%', [['≥ 90%', 25], ['85 – 89,9%', 21], ['80 – 84,9%', 17], ['75 – 79,9%', 13], ['70 – 74,9%', 9], ['60 – 69,9%', 5], ['&lt; 60%', 0]]) +
+    '<p class="nota">Natasha (recepción): objetivo 75%. Misma escala corrida 15 puntos: ≥ 75% = 25, 70 – 74,9% = 21 … menos de 45% = 0.</p>' +
     tabla('Tarea asignada (20) · días al día ÷ días cargados', [['100%', 20], ['90 – 99%', 18], ['80 – 89%', 15], ['70 – 79%', 12], ['60 – 69%', 8], ['&lt; 60%', 4]]) +
     tabla('Campañas (15) · ganadas con llamada atendida en 3CX', [['10 o más', 15], ['7 – 9', 12], ['5 – 6', 9], ['3 – 4', 6], ['1 – 2', 3], ['0', 0], ['Bonus si gestionó toda su planilla', '+5 (tope 15)'], ['Natasha (recepción)', 15]]) +
     tabla('TMO (10) · objetivo 2:45', [['≤ 2:45', 10], ['2:46 – 3:00', 8], ['3:01 – 3:15', 6], ['3:16 – 3:30', 4], ['&gt; 3:30', 2]]) +
