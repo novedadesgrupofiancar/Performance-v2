@@ -517,7 +517,7 @@ function filaRanking(a) {
   const mLeads = L.sinDatos ? 'sin datos' : fmt(L.promedio, 2) + '/10 · ' + L.diasConDatos + 'd';
   const mPct = C.pct === null ? 'sin datos' : fmt(C.pct) + '%';
   const mOwn = O.sinDatos ? 'sin datos' : O.diasAlDia + '/' + O.diasCargados + ' días';
-  const mCamp = K.recepcion ? 'Recepción' : K.ganadas + ' gan. · ' + K.puesto + '°';
+  const mCamp = K.recepcion ? 'Recepción' : K.ganadas + ' gan. · ' + K.puesto + '°' + (K.bonus ? ' · +' + K.bonus : '');
   const mTmo = C.tmo === null ? 'sin datos' : C.tmoTxt + (C.alertaTmo ? ' <span class="alerta" title="TMO menor a 1:30">⚠</span>' : '');
   return '<div class="rk-row body' + (a.puesto === 1 ? ' p1' : '') + '" data-ficha="' + esc(a.nombre) + '">' +
     '<div class="pos' + (a.puesto === 1 ? ' p1' : '') + '">' + a.puesto + '</div>' +
@@ -552,7 +552,7 @@ function abrirFicha(nombre) {
   h += desg('Leads', L.sinDatos ? 'sin datos' : 'promedio ' + fmt(L.promedio, 2) + '/10 × 3', L.pts, MAX.leads, COLOR_CMP.leads);
   h += desg('% Llamadas atendidas', C.pct === null ? 'sin datos' : fmt(C.pct) + '% · objetivo 90%', C.ptsPct, MAX.pct, COLOR_CMP.pct);
   h += desg('Tarea asignada', O.sinDatos ? 'sin datos' : O.diasAlDia + ' de ' + O.diasCargados + ' días al día (' + fmt(O.pct) + '%)', O.pts, MAX.own, COLOR_CMP.own);
-  h += desg('Campañas', K.recepcion ? 'Recepción · puntos fijos' : K.ganadas + ' ganadas · ' + K.puesto + '° del equipo', K.pts, MAX.camp, COLOR_CMP.camp);
+  h += desg('Campañas', K.recepcion ? 'Recepción · puntos fijos' : K.ganadas + ' ganadas con respaldo en 3CX · ' + K.puesto + '° del equipo' + (K.bonus ? ' · +' + K.bonus + ' por gestionar todas' : ''), K.pts, MAX.camp, COLOR_CMP.camp);
   h += desg('TMO', C.tmo === null ? 'sin datos' : C.tmoTxt + ' · objetivo 2:45', C.ptsTmo, MAX.tmo, COLOR_CMP.tmo);
   h += '</div>';
 
@@ -676,7 +676,7 @@ function vistaPuntaje() {
     '<p class="nota" style="margin-top:8px">Errores posibles: ' + (RESP ? RESP.equipo.erroresLead.map(esc).join(' · ') : '') + '.</p></div>' +
     tabla('% Llamadas atendidas (25) · objetivo 90%', [['≥ 90%', 25], ['85 – 89,9%', 21], ['80 – 84,9%', 17], ['75 – 79,9%', 13], ['70 – 74,9%', 9], ['60 – 69,9%', 5], ['&lt; 60%', 0]]) +
     tabla('Tarea asignada (20) · días al día ÷ días cargados', [['100%', 20], ['90 – 99%', 18], ['80 – 89%', 15], ['70 – 79%', 12], ['60 – 69%', 8], ['&lt; 60%', 4]]) +
-    tabla('Campañas ganadas (15)', [['10 o más', 15], ['7 – 9', 12], ['5 – 6', 9], ['3 – 4', 6], ['1 – 2', 3], ['0', 0], ['Natasha (recepción)', 15]]) +
+    tabla('Campañas (15) · ganadas con llamada atendida en 3CX', [['10 o más', 15], ['7 – 9', 12], ['5 – 6', 9], ['3 – 4', 6], ['1 – 2', 3], ['0', 0], ['Bonus si gestionó toda su planilla', '+5 (tope 15)'], ['Natasha (recepción)', 15]]) +
     tabla('TMO (10) · objetivo 2:45', [['≤ 2:45', 10], ['2:46 – 3:00', 8], ['3:01 – 3:15', 6], ['3:16 – 3:30', 4], ['&gt; 3:30', 2]]) +
     tabla('Nivel según la EXP (puntaje total)', [['100', lvlHtml(100)], ['90 – 99', lvlHtml(90)], ['85 – 89', lvlHtml(85)], ['80 – 84', lvlHtml(80)], ['75 – 79', lvlHtml(75)], ['65 – 74', lvlHtml(65)], ['menos de 65', lvlHtml(0)]]) +
     '<div class="card"><h3>Evaluación especial (Piero y Shoanna)</h3><p class="nota" style="margin-top:6px">Encuestas (50): ≥90% 50 · 85–89 32 · 80–84 24 · 70–79 12 · &lt;70 0.<br>' +
@@ -1185,15 +1185,172 @@ function vistaCarga() {
     '<div class="acciones" style="margin-top:12px"><button class="btn pri" id="btnLlamadas">Guardar datos importados</button></div></div>';
 
   // ---- Campañas
-  h += '<div class="h-sec">Campañas ganadas · ' + esc(etiqueta) + '</div><div class="card"><form id="fCamp"><div class="f-row" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">' +
-    porNom.map((ag) => {
-      if (!ag.campanas) return '<div class="fld"><label>' + esc(ag.nombre) + '</label><div class="prev">Recepción · 15 fijos</div></div>';
-      const a = porNombre(ag.nombre);
-      return '<div class="fld"><label for="c_' + ag.ext + '">' + esc(ag.nombre) + '</label><input class="inp" type="number" min="0" step="1" inputmode="numeric" id="c_' + ag.ext + '" data-ag="' + esc(ag.nombre) + '" value="' + (a && a.campanas.cargado ? a.campanas.ganadas : '') + '"></div>';
-    }).join('') +
-    '</div><div class="acciones" style="margin-top:10px"><button class="btn pri" type="submit">Guardar campañas</button></div></form></div>';
+  h += tarjetaCampanias(etiqueta, porNom, porNombre);
 
   return h + avisosHtml();
+}
+
+// ============================================================================
+// CAMPAÑAS DESDE LA TORRE DE CONTROL
+// Se leen las planillas de campaña del mes y los reportes de salientes de 3CX que la Torre ya recibe
+// por mail. Una ganada ("Agendado") cuenta solo si el agente tiene una llamada ATENDIDA a ese teléfono
+// en el mes. Quien gestionó todos los clientes de su planilla suma un bonus (hasta 5, tope 15).
+// La clave de la Torre se toma de este navegador (misma web: novedadesgrupofiancar.github.io).
+// ============================================================================
+const TORRE_URL = 'https://script.google.com/macros/s/AKfycbzpWQHAJPTU1KoQt1agvpaxFcrNTYhiX0oBDRsLL9yktEY1O6aNm9PQ7yFzhZ-_uGCJ/exec';
+const CAMP = { mes: '', estado: '', error: '', res: null };
+
+async function torreApi(accion, datos) {
+  let clave = '';
+  try { clave = localStorage.getItem('torre-clave-acceso') || ''; } catch (e) {}
+  if (!clave) throw new Error('este navegador no tiene la clave de la Torre de control. Entrá una vez a la Torre (novedadesgrupofiancar.github.io/torre-de-control) en este mismo navegador y volvé a probar.');
+  const corte = new AbortController();
+  const reloj = setTimeout(() => corte.abort(), 120000);
+  let r;
+  try {
+    r = await fetch(TORRE_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: accion, claveAcceso: clave, datos: datos || {} }), signal: corte.signal });
+    r = await r.json();
+  } catch (e) {
+    throw new Error(e.name === 'AbortError' ? 'la Torre de control no respondió en 2 minutos.' : 'no hay conexión con la Torre de control (' + e.message + ').');
+  } finally { clearTimeout(reloj); }
+  if (!r.ok) throw new Error(r.codigo === 'CLAVE_INVALIDA' ? 'la clave de la Torre guardada en este navegador ya no sirve: entrá a la Torre de nuevo.' : (r.error || 'error de la Torre de control.'));
+  return r.datos;
+}
+
+const ult8 = (t) => { const d = String(t || '').replace(/\D/g, ''); return d.length >= 8 ? d.slice(-8) : ''; };
+
+/** Llamadas salientes {interno, numero, atendida, fecha} de los CSV de 3CX (formato "From/To" o "outbound_calls"). */
+function llamadasSalientes(textos) {
+  const llamadas = [], vistas = {};
+  textos.forEach((texto) => {
+    const filas = leerCsvSimple(texto);
+    const enc = (filas[0] || []).map((h) => h.trim().toLowerCase());
+    const c = (n) => enc.indexOf(n);
+    const cFrom = c('from'), cTo = c('to'), cCaller = c('caller id'), cNom = c('caller display name'), cDest = c('destination callee id'), cStatus = c('status'), cTime = c('call time');
+    filas.slice(1).forEach((f) => {
+      const firma = f.join('|');
+      if (vistas[firma]) return;
+      vistas[firma] = true;
+      let interno = '', numero = '';
+      if (cFrom >= 0 && cTo >= 0) { interno = ((f[cFrom] || '').match(/\((\d{3,5})\)\s*$/) || [])[1] || ''; numero = ult8(f[cTo]); }
+      else if (cCaller >= 0) {
+        interno = /^\d{3,5}$/.test((f[cCaller] || '').trim()) ? f[cCaller].trim() : (((f[cNom] || '').match(/\((\d{3,5})\)\s*$/) || [])[1] || '');
+        numero = ult8(cDest >= 0 ? f[cDest] : '');
+      }
+      if (!interno || !numero) return;
+      llamadas.push({ interno: interno, numero: numero, atendida: String(f[cStatus] || '').trim().toLowerCase() === 'answered', fecha: String(cTime >= 0 ? f[cTime] || '' : '').replace('T', ' ') });
+    });
+  });
+  return llamadas;
+}
+
+function leerCsvSimple(texto) {
+  texto = String(texto || '').replace(/^﻿/, '');
+  const filas = []; let fila = [], cur = '', q = false;
+  for (let i = 0; i < texto.length; i++) {
+    const ch = texto[i];
+    if (q) { if (ch === '"' && texto[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ',') { fila.push(cur); cur = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && texto[i + 1] === '\n') i++; fila.push(cur); cur = ''; if (fila.some((x) => x !== '')) filas.push(fila); fila = []; }
+    else cur += ch;
+  }
+  fila.push(cur); if (fila.some((x) => x !== '')) filas.push(fila);
+  return filas;
+}
+
+/** Cruza las planillas con las llamadas. Devuelve, por agente de Liga CX, lo necesario para el puntaje. */
+function resumirCampania(filas, agentesTorre, llamadas, mes) {
+  const torrePorNombre = {};
+  (agentesTorre || []).forEach((a) => { torrePorNombre[sinTildes(a.nombre)] = a; });
+  const ligaPorExt = {}, ligaPorNombre = {};
+  RESP.equipo.agentes.forEach((a) => { ligaPorExt[a.ext] = a; ligaPorNombre[sinTildes(a.nombre)] = a; });
+  // Agente de Liga CX a partir del nombre de la planilla: por interno de la Torre, o por nombre y apellido.
+  const deLiga = (nombre) => {
+    const n = sinTildes(nombre);
+    const t = torrePorNombre[n];
+    if (t && ligaPorExt[t.interno]) return { ag: ligaPorExt[t.interno], interno: t.interno };
+    const p = n.split(' ');
+    const a = ligaPorNombre[n] || RESP.equipo.agentes.filter((x) => { const q = sinTildes(x.nombre).split(' '); return q[0] === p[0] && (!p[1] || !q[1] || q[1].slice(0, 4) === p[1].slice(0, 4)); })[0];
+    return a ? { ag: a, interno: (t && t.interno) || a.ext } : null;
+  };
+  const atendidas = {};
+  llamadas.forEach((l) => { if (l.atendida && (!l.fecha || l.fecha.slice(0, 7) === mes)) atendidas[l.interno + '|' + l.numero] = true; });
+  const res = {}, sinMapear = {};
+  filas.forEach((f) => {
+    const m = deLiga(f.agente);
+    if (!m) { if (f.agente) sinMapear[f.agente] = true; return; }
+    const r = res[m.ag.nombre] = res[m.ag.nombre] || { nombre: m.ag.nombre, asignadas: 0, gestionadas: 0, ganadas: 0, respaldadas: 0, sinRespaldo: [] };
+    r.asignadas++;
+    if (f.oportunidad) r.gestionadas++;
+    if (f.oportunidad === 'Agendado') {
+      r.ganadas++;
+      const nums = [ult8(f.telefono), ult8(f.telefono_alternativo)].filter(Boolean);
+      if (nums.some((n) => atendidas[m.interno + '|' + n])) r.respaldadas++;
+      else r.sinRespaldo.push((f.cliente || 'sin nombre') + ' (' + (f.telefono || 'sin teléfono') + ', ' + f.hoja + ')');
+    }
+  });
+  Object.keys(res).forEach((k) => { const r = res[k]; r.todas = r.asignadas > 0 && r.gestionadas === r.asignadas; });
+  return { porAgente: res, sinMapear: Object.keys(sinMapear), llamadas: llamadas.length };
+}
+
+async function traerCampaniasTorre() {
+  const mes = mesDeCarga();
+  Object.assign(CAMP, { mes: mes, estado: 'leyendo', error: '', res: null });
+  render();
+  try {
+    const hasta = mes + '-' + String(new Date(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)), 0).getDate()).padStart(2, '0');
+    const [config, campania, reportes] = await Promise.all([
+      torreApi('obtenerConfiguracion', {}),
+      torreApi('leerCampania', { mes: mes }),
+      torreApi('reportes3CXDelPeriodo', { desde: mes + '-01', hasta: hasta < hoyISO() ? hasta : hoyISO(), tipos: ['salientes'] })
+    ]);
+    const textos = (reportes.archivos || []).map((a) => a.texto);
+    const r = resumirCampania(campania.filas || [], config.agentes || [], llamadasSalientes(textos), mes);
+    r.dias3cx = (reportes.archivos || []).length;
+    Object.assign(CAMP, { estado: 'listo', res: r });
+  } catch (e) {
+    Object.assign(CAMP, { estado: 'error', error: e.message });
+  }
+  render();
+}
+
+function tarjetaCampanias(etiqueta, porNom, porNombre) {
+  const r = CAMP.mes === mesDeCarga() ? CAMP.res : null;
+  let aviso = '';
+  if (CAMP.estado === 'leyendo') aviso = '<div class="aviso info"><span class="aviso-i">⏳</span><div><b>Leyendo la Torre de control…</b><div>Planillas de campaña y salientes de 3CX del mes. Puede tardar hasta un minuto.</div></div></div>';
+  else if (CAMP.estado === 'error') aviso = '<div class="aviso mal"><span class="aviso-i">✗</span><div><b>No se pudo traer de la Torre</b><div>' + esc(CAMP.error) + '</div></div></div>';
+  else if (r) aviso = '<div class="aviso bien"><span class="aviso-i">✓</span><div><b>Traído de la Torre de control</b><div>' + r.llamadas + ' llamadas salientes de ' + r.dias3cx + ' reportes de 3CX. Revisá la tabla y tocá <b>Guardar campañas</b>.' +
+    (r.dias3cx === 0 ? '<div class="aviso-extra">⚠ No llegó ningún reporte de salientes de este mes: ninguna ganada va a tener respaldo.</div>' : '') +
+    (r.sinMapear.length ? '<div class="aviso-extra">⚠ Agentes de las planillas que no son de tus 6: ' + esc(r.sinMapear.join(', ')) + ' (se ignoran).</div>' : '') + '</div></div></div>';
+  let h = '<div class="h-sec">Campañas · ' + esc(etiqueta) + '</div><div class="card"><div class="sub">Cuentan solo las ganadas (Agendado) con una llamada <b>atendida</b> en 3CX a ese cliente. Quien gestionó todos los clientes de su planilla suma hasta 5 puntos más (tope 15).</div>' +
+    '<div class="acciones"><button class="btn pri" type="button" id="btnTorre">Traer de Torre de control</button></div>' + aviso +
+    '<form id="fCamp"><div class="scroll"><table class="t" style="margin-top:10px"><thead><tr><th>Agente</th><th class="r">Asignadas</th><th class="r">Gestionadas</th><th class="r">Ganadas</th><th class="r">Con respaldo</th><th>Gestionó todas</th></tr></thead><tbody>' +
+    porNom.map((ag) => {
+      if (!ag.campanas) return '<tr><td class="txt">' + esc(ag.nombre) + '</td><td colspan="5" class="muted">Recepción · 15 fijos</td></tr>';
+      const a = porNombre(ag.nombre), t = r && r.porAgente[ag.nombre];
+      const val = t ? t.respaldadas : (a && a.campanas.cargado ? a.campanas.ganadas : '');
+      const todas = t ? t.todas : !!(a && a.campanas.gestionoTodas);
+      return '<tr data-camp="' + esc(ag.nombre) + '"' + (t ? ' data-sinresp="' + t.sinRespaldo.length + '" data-detalle="' + esc(t.ganadas + ' ganadas, ' + t.respaldadas + ' con respaldo; ' + t.gestionadas + '/' + t.asignadas + ' gestionadas') + '"' : '') + '><td class="txt"><b>' + esc(ag.nombre) + '</b>' +
+        (t && t.sinRespaldo.length ? '<details><summary class="nota" style="cursor:pointer">' + t.sinRespaldo.length + ' sin respaldo</summary><div class="nota">' + t.sinRespaldo.map(esc).join('<br>') + '</div></details>' : '') + '</td>' +
+        '<td class="r">' + (t ? t.asignadas : '—') + '</td><td class="r">' + (t ? t.gestionadas : '—') + '</td><td class="r">' + (t ? t.ganadas : '—') + '</td>' +
+        '<td class="r"><input class="inp sm" type="number" min="0" step="1" inputmode="numeric" name="ganadas" value="' + val + '" style="width:80px;text-align:right"></td>' +
+        '<td><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="todas"' + (todas ? ' checked' : '') + '> ' + (t ? (t.todas ? 'Sí' : 'No (' + (t.asignadas - t.gestionadas) + ' sin gestionar)') : '') + '</label></td></tr>';
+    }).join('') +
+    '</tbody></table></div><div class="acciones" style="margin-top:10px"><button class="btn pri" type="submit">Guardar campañas</button></div></form></div>';
+  return h;
+}
+
+function guardarCampaniasForm(fc) {
+  const valores = {}, todas = {}, sinRespaldo = {}, detalle = {};
+  fc.querySelectorAll('tr[data-camp]').forEach((tr) => {
+    const n = tr.dataset.camp, v = tr.querySelector('input[name=ganadas]').value;
+    if (v === '') return;
+    valores[n] = Number(v);
+    todas[n] = tr.querySelector('input[name=todas]').checked;
+    if (tr.dataset.sinresp !== undefined) { sinRespaldo[n] = Number(tr.dataset.sinresp); detalle[n] = tr.dataset.detalle; }
+  });
+  guardar(fc.querySelector('button[type=submit]'), 'guardarCampanas', { mes: mesDeCarga(), valores: valores, todas: todas, sinRespaldo: sinRespaldo, detalle: detalle }, 'Campañas guardadas');
 }
 
 function avisosHtml() {
@@ -1233,12 +1390,9 @@ function prepararCarga() {
   const bl = $('btnLlamadas');
   if (bl) bl.addEventListener('click', guardarLlamadas);
   const fc = $('fCamp');
-  if (fc) fc.addEventListener('submit', (ev) => {
-    ev.preventDefault();
-    const valores = {};
-    fc.querySelectorAll('input[data-ag]').forEach((i) => { if (i.value !== '') valores[i.dataset.ag] = Number(i.value); });
-    guardar(fc.querySelector('button'), 'guardarCampanas', { mes: mesDeCarga(), valores: valores }, 'Campañas guardadas');
-  });
+  if (fc) fc.addEventListener('submit', (ev) => { ev.preventDefault(); guardarCampaniasForm(fc); });
+  const bt = $('btnTorre');
+  if (bt) bt.addEventListener('click', traerCampaniasTorre);
 }
 
 function leadExistente(fecha, agente) {
