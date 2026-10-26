@@ -1198,7 +1198,7 @@ function vistaCarga() {
 // La clave de la Torre se toma de este navegador (misma web: novedadesgrupofiancar.github.io).
 // ============================================================================
 const TORRE_URL = 'https://script.google.com/macros/s/AKfycbzpWQHAJPTU1KoQt1agvpaxFcrNTYhiX0oBDRsLL9yktEY1O6aNm9PQ7yFzhZ-_uGCJ/exec';
-const CAMP = { mes: '', estado: '', error: '', res: null };
+const CAMP = { mes: '', estado: '', error: '', res: null, torre: null, extras: [], extrasNombres: [] };
 
 async function torreApi(accion, datos) {
   let clave = '';
@@ -1294,9 +1294,28 @@ function resumirCampania(filas, agentesTorre, llamadas, mes) {
   return { porAgente: res, sinMapear: Object.keys(sinMapear), llamadas: llamadas.length };
 }
 
+/** Vuelve a cruzar con lo traído de la Torre + los CSV de salientes que sumaste a mano. */
+function recalcularCampania() {
+  const T = CAMP.torre;
+  if (!T) return;
+  const r = resumirCampania(T.filas, T.agentes, llamadasSalientes(T.textos.concat(CAMP.extras)), CAMP.mes);
+  r.dias3cx = T.dias.length; r.diasTorre = T.dias.slice().sort(); r.extras = CAMP.extrasNombres.slice();
+  CAMP.res = r;
+}
+
+async function sumarSalientesCampania(ev) {
+  const files = Array.from(ev.target.files);
+  if (!files.length) return;
+  const textos = await Promise.all(files.map((f) => f.text()));
+  CAMP.extras = CAMP.extras.concat(textos); CAMP.extrasNombres = CAMP.extrasNombres.concat(files.map((f) => f.name));
+  recalcularCampania();
+  render();
+}
+
 async function traerCampaniasTorre() {
   const mes = mesDeCarga();
-  Object.assign(CAMP, { mes: mes, estado: 'leyendo', error: '', res: null });
+  if (CAMP.mes !== mes) { CAMP.extras = []; CAMP.extrasNombres = []; }
+  Object.assign(CAMP, { mes: mes, estado: 'leyendo', error: '', res: null, torre: null });
   render();
   try {
     const hasta = mes + '-' + String(new Date(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)), 0).getDate()).padStart(2, '0');
@@ -1305,10 +1324,9 @@ async function traerCampaniasTorre() {
       torreApi('leerCampania', { mes: mes }),
       torreApi('reportes3CXDelPeriodo', { desde: mes + '-01', hasta: hasta < hoyISO() ? hasta : hoyISO(), tipos: ['salientes'] })
     ]);
-    const textos = (reportes.archivos || []).map((a) => a.texto);
-    const r = resumirCampania(campania.filas || [], config.agentes || [], llamadasSalientes(textos), mes);
-    r.dias3cx = (reportes.archivos || []).length;
-    Object.assign(CAMP, { estado: 'listo', res: r });
+    CAMP.torre = { filas: campania.filas || [], agentes: config.agentes || [], textos: (reportes.archivos || []).map((a) => a.texto), dias: (reportes.archivos || []).map((a) => a.fecha_datos) };
+    recalcularCampania();
+    CAMP.estado = 'listo';
   } catch (e) {
     Object.assign(CAMP, { estado: 'error', error: e.message });
   }
@@ -1320,11 +1338,11 @@ function tarjetaCampanias(etiqueta, porNom, porNombre) {
   let aviso = '';
   if (CAMP.estado === 'leyendo') aviso = '<div class="aviso info"><span class="aviso-i">⏳</span><div><b>Leyendo la Torre de control…</b><div>Planillas de campaña y salientes de 3CX del mes. Puede tardar hasta un minuto.</div></div></div>';
   else if (CAMP.estado === 'error') aviso = '<div class="aviso mal"><span class="aviso-i">✗</span><div><b>No se pudo traer de la Torre</b><div>' + esc(CAMP.error) + '</div></div></div>';
-  else if (r) aviso = '<div class="aviso bien"><span class="aviso-i">✓</span><div><b>Traído de la Torre de control</b><div>' + r.llamadas + ' llamadas salientes de ' + r.dias3cx + ' reportes de 3CX. Revisá la tabla y tocá <b>Guardar campañas</b>.' +
-    (r.dias3cx === 0 ? '<div class="aviso-extra">⚠ No llegó ningún reporte de salientes de este mes: ninguna ganada va a tener respaldo.</div>' : '') +
+  else if (r) aviso = '<div class="aviso bien"><span class="aviso-i">✓</span><div><b>Traído de la Torre de control</b><div>' + r.llamadas + ' llamadas salientes: ' + (r.dias3cx ? r.dias3cx + ' días por mail en la Torre (' + esc(fechaCorta(r.diasTorre[0])) + ' al ' + esc(fechaCorta(r.diasTorre[r.diasTorre.length - 1])) + ')' : 'ningún día por mail en la Torre') + (r.extras.length ? ' + ' + esc(r.extras.join(', ')) : '') + '. Revisá la tabla y tocá <b>Guardar campañas</b>.' +
+    (!r.extras.length && (!r.dias3cx || r.diasTorre[0] > CAMP.mes + '-01') ? '<div class="aviso-extra">⚠ La Torre no tiene las salientes de todo el mes' + (r.dias3cx ? ' (arrancan el ' + esc(fechaCorta(r.diasTorre[0])) + ')' : '') + ': las ganadas de los otros días no van a tener respaldo. Sumá el CSV de salientes de 3CX del mes (outbound_calls) con el botón de arriba.</div>' : '') +
     (r.sinMapear.length ? '<div class="aviso-extra">⚠ Agentes de las planillas que no son de tus 6: ' + esc(r.sinMapear.join(', ')) + ' (se ignoran).</div>' : '') + '</div></div></div>';
   let h = '<div class="h-sec">Campañas · ' + esc(etiqueta) + '</div><div class="card"><div class="sub">Cuentan solo las ganadas (Agendado) con una llamada <b>atendida</b> en 3CX a ese cliente. Quien gestionó todos los clientes de su planilla suma hasta 5 puntos más (tope 15).</div>' +
-    '<div class="acciones"><button class="btn pri" type="button" id="btnTorre">Traer de Torre de control</button></div>' + aviso +
+    '<div class="acciones"><button class="btn pri" type="button" id="btnTorre">Traer de Torre de control</button>' + (r ? '<span class="btn file">Sumar salientes de 3CX (CSV)<input type="file" accept=".csv,text/csv" id="campSalientes" multiple></span>' : '') + '</div>' + aviso +
     '<form id="fCamp"><div class="scroll"><table class="t" style="margin-top:10px"><thead><tr><th>Agente</th><th class="r">Asignadas</th><th class="r">Gestionadas</th><th class="r">Ganadas</th><th class="r">Con respaldo</th><th>Gestionó todas</th></tr></thead><tbody>' +
     porNom.map((ag) => {
       if (!ag.campanas) return '<tr><td class="txt">' + esc(ag.nombre) + '</td><td colspan="5" class="muted">Recepción · 15 fijos</td></tr>';
@@ -1393,6 +1411,8 @@ function prepararCarga() {
   if (fc) fc.addEventListener('submit', (ev) => { ev.preventDefault(); guardarCampaniasForm(fc); });
   const bt = $('btnTorre');
   if (bt) bt.addEventListener('click', traerCampaniasTorre);
+  const cs = $('campSalientes');
+  if (cs) cs.addEventListener('change', sumarSalientesCampania);
 }
 
 function leadExistente(fecha, agente) {
