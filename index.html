@@ -1284,7 +1284,8 @@ function resumirCampania(filas, agentesTorre, llamadas, mes) {
     const r = res[m.ag.nombre] = res[m.ag.nombre] || { nombre: m.ag.nombre, asignadas: 0, gestionadas: 0, ganadas: 0, respaldadas: 0, sinRespaldo: [] };
     r.asignadas++;
     if (f.oportunidad) r.gestionadas++;
-    if (f.oportunidad === 'Agendado') {
+    // Ganada: "Agendado" (Chevrolet) o "Ganada" (así se escribe en la planilla de Marcas)
+    if (['agendado', 'ganada'].includes(sinTildes(f.oportunidad))) {
       r.ganadas++;
       const nums = [ult8(f.telefono), ult8(f.telefono_alternativo)].filter(Boolean);
       if (nums.some((n) => atendidas[m.interno + '|' + n])) r.respaldadas++;
