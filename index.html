@@ -279,6 +279,10 @@ table.t .r { text-align: right; }
 .tbl-inp td { padding: 4px 6px; }
 .tbl-inp .inp { min-width: 70px; }
 
+/* ---------- Ingreso */
+.login { max-width: 400px; margin: 48px auto; }
+.login .card { padding: 24px; }
+
 /* ---------- Toast y carga */
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--s2); border: 1px solid var(--border2); border-radius: var(--radius-pill); box-shadow: var(--shadow-pop); padding: 10px 18px; font-size: 14px; font-weight: 600; z-index: 80; max-width: calc(100% - 32px); }
 .toast.err { border-color: var(--red); color: var(--red); }
@@ -321,6 +325,7 @@ table.t .r { text-align: right; }
     <span class="chip" id="chipSync">Cargando…</span>
     <span class="chip admin" id="chipRol" hidden>Admin</span>
     <button class="btn" id="btnPng" hidden>Exportar PNG</button>
+    <button class="btn" id="btnSalir" hidden>Salir</button>
   </div>
   <nav class="tabs" id="tabs"></nav>
 </header>
@@ -333,14 +338,19 @@ table.t .r { text-align: right; }
 <script>
 'use strict';
 // ============================================================================
-// MODO: lo define la URL. ?admin=CLAVE -> el backend valida la clave.
-// La clave NO se guarda en este archivo (se sube a GitHub Pages y es público).
+// INGRESO: cada uno entra con su clave (admin o agente) y el backend la valida.
+// La clave queda guardada solo en este navegador hasta tocar "Salir". Nunca va en la URL.
 // ============================================================================
 const Q = new URLSearchParams(location.search);
-const ADMIN_KEY = Q.get('admin') || '';
 const ES_LOCAL = ['localhost', '127.0.0.1'].indexOf(location.hostname) >= 0;
 const MODO_MOCK = ES_LOCAL && Q.get('api') === 'mock';   // solo pruebas locales
-const CACHE_KEY = 'perf_fiancar_cache_v1_' + (ADMIN_KEY ? 'admin' : 'equipo');
+const CLAVE_KEY = 'ligacx_clave';
+const CACHE_KEY = 'ligacx_cache_v2';
+let CLAVE = '';
+try { CLAVE = localStorage.getItem(CLAVE_KEY) || ''; } catch (e) {}
+if (MODO_MOCK && Q.get('admin')) CLAVE = Q.get('admin');   // atajo solo para pruebas locales
+// Links viejos con ?admin=...: se borra la clave de la barra de direcciones.
+if (!MODO_MOCK && Q.has('admin')) { Q.delete('admin'); history.replaceState(null, '', location.pathname + (Q.toString() ? '?' + Q : '') + location.hash); }
 
 let RESP = null;
 let MES = Q.get('mes') || null;
@@ -356,17 +366,10 @@ const $ = (id) => document.getElementById(id);
 // ============================================================================
 function backendConfigurado() { return MODO_MOCK || /^https:\/\/script\.google(usercontent)?\.com\//.test(API_URL); }
 
-async function apiGet() {
-  if (MODO_MOCK) return MOCK.get(ADMIN_KEY);
-  const url = API_URL + '?t=' + Date.now() + (ADMIN_KEY ? '&admin=' + encodeURIComponent(ADMIN_KEY) : '');
-  const r = await fetch(url, { redirect: 'follow' });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return r.json();
-}
-
-async function apiPost(accion, datos) {
+async function apiPost(accion, datos, clave) {
+  const token = clave === undefined ? CLAVE : clave;
   let res;
-  if (MODO_MOCK) res = MOCK.post(ADMIN_KEY, accion, datos);
+  if (MODO_MOCK) res = MOCK.post(token, accion, datos);
   else {
     // text/plain evita el preflight CORS que Apps Script no soporta.
     // Si la planilla no responde en 60 s, se corta con un error claro (nunca queda "cargando" para siempre).
@@ -375,12 +378,13 @@ async function apiPost(accion, datos) {
     let r;
     try {
       r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ token: ADMIN_KEY, accion: accion, datos: datos }), signal: corte.signal });
+        body: JSON.stringify({ token: token, accion: accion, datos: datos }), signal: corte.signal });
     } catch (e) {
       throw new Error(e.name === 'AbortError' ? 'la planilla no respondió en 60 segundos. Probá de nuevo.' : 'no hay conexión con la planilla (' + e.message + '). Si usás Brave, desactivá Shields para esta página.');
     } finally { clearTimeout(reloj); }
     try { res = await r.json(); } catch (e) { throw new Error('la planilla respondió algo inesperado (HTTP ' + r.status + ').'); }
   }
+  if (res.requiereLogin) { const e = new Error(res.error || 'Ingresá con tu clave.'); e.login = true; throw e; }
   if (!res.ok && !res.confirmar) throw new Error(res.error || 'Error desconocido');
   return res;
 }
@@ -403,16 +407,20 @@ async function iniciar() {
     $('main').innerHTML = '<div class="vacio"><b>Falta conectar la planilla</b>Pegá la URL del Apps Script en la constante <span class="mono">API_URL</span> al principio de <span class="mono">index.html</span>.<br>Paso a paso en <span class="mono">docs/INSTALACION.md</span>.</div>';
     return;
   }
+  if (MODO_MOCK) {
+    try { await cargarMock(); } catch (e) { $('main').innerHTML = '<div class="vacio"><b>No se pudo cargar el backend de prueba</b>' + esc(e.message) + '</div>'; return; }
+  }
+  if (!CLAVE) { mostrarLogin(); return; }
   // Caché de lectura: pinta al instante lo último que se vio, mientras llega el backend.
   try {
     const c = localStorage.getItem(CACHE_KEY);
     if (c && !MODO_MOCK) { RESP = JSON.parse(c); elegirMes(); render(); setSync('Copia guardada · actualizando…', 'warn'); }
   } catch (e) {}
   try {
-    if (MODO_MOCK) await cargarMock();
     await refrescar();
   } catch (e) {
     console.error(e);
+    if (e.login) { salir('Tu clave ya no es válida. Ingresá de nuevo.'); return; }
     if (RESP) setSync('Sin conexión · mostrando copia guardada', 'err');
     else {
       setSync('Sin conexión', 'err');
@@ -421,8 +429,54 @@ async function iniciar() {
   }
 }
 
+// ============================================================================
+// INGRESO / SALIDA
+// ============================================================================
+function mostrarLogin(msg) {
+  RESP = null;
+  ['selMes', 'chipRol', 'btnPng', 'btnSalir'].forEach((id) => { $(id).hidden = true; });
+  $('tabs').innerHTML = '';
+  $('pie').textContent = '';
+  setSync('Sin ingresar', '');
+  $('main').innerHTML = '<div class="login"><form class="card" id="fLogin" autocomplete="off">' +
+    '<div class="h-sec" style="margin-top:0">Ingresar</div>' +
+    '<p class="nota" style="margin-bottom:12px">Escribí tu clave. Si no la tenés, pedísela a tu coordinador.</p>' +
+    '<div class="fld"><label for="lgClave">Clave</label><input class="inp" id="lgClave" type="password" autocomplete="current-password" autofocus></div>' +
+    '<div id="lgMsg">' + (msg ? '<div class="aviso mal"><span class="aviso-i">✗</span><div>' + esc(msg) + '</div></div>' : '') + '</div>' +
+    '<button class="btn pri" type="submit" style="width:100%;margin-top:12px">Entrar</button></form></div>';
+  $('fLogin').addEventListener('submit', ingresar);
+  setTimeout(() => { const i = $('lgClave'); if (i) i.focus(); }, 0);
+}
+
+async function ingresar(ev) {
+  ev.preventDefault();
+  const clave = $('lgClave').value.replace(/[\s ​-‍⁠﻿]/g, '');
+  const msg = $('lgMsg'), btn = ev.target.querySelector('button');
+  if (!clave) { msg.innerHTML = '<div class="aviso mal"><span class="aviso-i">✗</span><div>Escribí tu clave.</div></div>'; return; }
+  btn.disabled = true;
+  msg.innerHTML = '<div class="aviso info"><span class="aviso-i">…</span><div>Verificando la clave…</div></div>';
+  try {
+    const r = await apiPost('login', {}, clave);
+    CLAVE = clave;
+    try { localStorage.setItem(CLAVE_KEY, clave); localStorage.removeItem(CACHE_KEY); } catch (e) {}
+    msg.innerHTML = '<div class="aviso bien"><span class="aviso-i">✓</span><div>Hola' + (r.nombre ? ' ' + esc(r.nombre.split(' ')[0]) : '') + '. Cargando tus datos…</div></div>';
+    TAB = 'ranking';
+    await refrescar();
+  } catch (e) {
+    btn.disabled = false;
+    msg.innerHTML = '<div class="aviso mal"><span class="aviso-i">✗</span><div>' + esc(e.login ? 'Clave incorrecta.' : 'No se pudo verificar: ' + e.message) + '</div></div>';
+  }
+}
+
+function salir(msg) {
+  CLAVE = '';
+  try { localStorage.removeItem(CLAVE_KEY); localStorage.removeItem(CACHE_KEY); } catch (e) {}
+  cerrarFicha();
+  mostrarLogin(msg);
+}
+
 async function refrescar() {
-  const r = await apiGet();
+  const r = await apiPost('leer', {});
   if (!r.ok) throw new Error(r.error || 'Respuesta inválida del backend');
   RESP = r;
   try { if (!MODO_MOCK) localStorage.setItem(CACHE_KEY, JSON.stringify(r)); } catch (e) {}
@@ -441,13 +495,17 @@ function elegirMes() {
 }
 
 function esAdmin() { return !!(RESP && RESP.esAdmin); }
+function usuario() { return (RESP && RESP.usuario) || ''; }
+function esEspecial(n) { return !!(RESP && RESP.equipo.especiales.some((s) => s.nombre === n)); }
 
 // ============================================================================
 // RENDER GENERAL
 // ============================================================================
 function render() {
-  const admin = esAdmin();
-  $('chipRol').hidden = !admin;
+  const admin = esAdmin(), yo = usuario();
+  $('chipRol').hidden = false;
+  $('chipRol').textContent = admin ? 'Admin' : yo;
+  $('btnSalir').hidden = false;
   $('btnPng').hidden = !admin || !MES;
   // Selector de mes
   const sel = $('selMes');
@@ -456,6 +514,7 @@ function render() {
     esc(m.etiqueta) + (admin && !m.publicado ? ' · borrador' : '') + '</option>').join('');
   // Pestañas
   const tabs = [['ranking', 'Ranking'], ['especiales', 'Evaluación especial'], ['puntaje', 'Cómo se calcula']];
+  if (!admin && !esEspecial(yo)) tabs.splice(1, 1);   // los agentes regulares no ven la evaluación especial
   if (admin) { tabs.splice(1, 0, ['control', 'Control de leads']); tabs.push(['carga', 'Carga de datos']); }
   if (!tabs.some((t) => t[0] === TAB)) TAB = 'ranking';
   $('tabs').innerHTML = tabs.map((t) => '<button class="tab' + (t[0] === TAB ? ' on' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>').join('');
@@ -472,14 +531,11 @@ function render() {
   if (TAB === 'carga') prepararCarga();
   if (TAB === 'control') prepararControl();
   if (TAB === 'especiales' && admin) prepararEspeciales();
-  $('pie').textContent = 'Datos: planilla de Google · ' + (admin ? 'modo admin' : 'modo equipo (solo lectura)') + (MODO_MOCK ? ' · BACKEND DE PRUEBA' : '');
+  $('pie').textContent = 'Datos: planilla de Google · ' + (admin ? 'modo admin' : 'modo agente (solo lectura)') + (MODO_MOCK ? ' · BACKEND DE PRUEBA' : '');
 }
 
 function bannerAdmin() {
   let h = '';
-  if (ADMIN_KEY && RESP && !RESP.esAdmin) {
-    h += '<div class="banner err"><span class="grow"><b>La clave de admin no es válida.</b> ' + esc(RESP.adminError || '') + ' Estás viendo el modo equipo.</span></div>';
-  }
   if (MODO_MOCK) h += '<div class="banner warn"><span class="grow">Backend de prueba en memoria (pruebas locales). Nada de esto se guarda en la planilla real.</span></div>';
   return h;
 }
@@ -521,7 +577,7 @@ function vistaRanking() {
     '<div style="text-align:right">EXP · LVL</div></div>';
   dm.agentes.forEach((a) => { h += filaRanking(a); });
   h += '</div>';
-  h += '<p class="nota" style="margin-top:8px">Tocá un agente para ver su ficha. <span class="alerta">⚠</span> = TMO menor a 1:30 (solo alerta, no resta puntos).</p>';
+  h += '<p class="nota" style="margin-top:8px">' + (admin ? 'Tocá un agente para ver su ficha.' : 'Tocá tu fila para ver tu ficha.') + ' <span class="alerta">⚠</span> = TMO menor a 1:30 (solo alerta, no resta puntos).</p>';
   h += '</div>';
   return h;
 }
@@ -583,7 +639,25 @@ function cmp(lbl, pts, max, metrica, sinDatos, color) {
     '<div class="m">' + metrica + '</div>' + bloques(pts, max, color || 'var(--accent)') + '</div>';
 }
 
+/** Fila de un compañero, vista por un agente: solo % atendidas, TMO, EXP y nivel. */
+function filaRankingOculta(a) {
+  const C = a.llamadas;
+  const nada = (lbl) => '<div class="cmp"><span class="lbl">' + lbl + '</span><div class="n sindatos">—</div><div class="m">&nbsp;</div></div>';
+  const mTmo = C.tmo === null ? 'sin datos' : C.tmoTxt + (C.alertaTmo ? ' <span class="alerta" title="TMO menor a 1:30">⚠</span>' : '');
+  return '<div class="rk-row' + (a.puesto === 1 ? ' p1' : '') + '">' +
+    '<div class="pos' + (a.puesto === 1 ? ' p1' : '') + '">' + a.puesto + '</div>' +
+    '<div class="ag">' + avatar(a.nombre, 42) + '<div><b>' + esc(a.nombre) + '</b><span>' + a.ext + ' · ' + esc(a.tarea) + '</span></div></div>' +
+    '<div class="cmps">' + nada('Leads') +
+    cmp('% Atend', C.ptsPct, MAX.pct, C.pct === null ? 'sin datos' : fmt(C.pct) + '%', C.pct === null, COLOR_CMP.pct) +
+    nada('Owner') + nada('Camp.') +
+    cmp('TMO', C.ptsTmo, MAX.tmo, mTmo, C.tmo === null, COLOR_CMP.tmo) +
+    '</div>' +
+    '<div class="tot"><span class="exp c-' + a.semaforo + '">' + fmt(a.total) + '</span><span class="exp-l">EXP</span><br>' + lvlHtml(a.total) + '</div>' +
+    '</div>';
+}
+
 function filaRanking(a) {
+  if (a.oculto) return filaRankingOculta(a);
   const L = a.leads, O = a.ownership, C = a.llamadas, K = a.campanas;
   const mLeads = L.sinDatos ? 'sin datos' : fmt(L.promedio, 2) + '/10 · ' + L.diasConDatos + 'd';
   const mPct = C.pct === null ? 'sin datos' : fmt(C.pct) + '%';
@@ -609,7 +683,7 @@ function filaRanking(a) {
 function abrirFicha(nombre) {
   const dm = RESP.datos[MES];
   const a = dm.agentes.filter((x) => x.nombre === nombre)[0];
-  if (!a) return;
+  if (!a || a.oculto) return;
   const L = a.leads, O = a.ownership, C = a.llamadas, K = a.campanas;
   let h = '<div class="ov" data-cerrar="1"><div class="modal" role="dialog" aria-label="Ficha de ' + esc(a.nombre) + '">';
   h += '<div class="modal-h">' + avatar(a.nombre, 72) + '<div class="grow"><h2>' + esc(a.nombre) + '</h2><div class="t2" style="font-size:13px">' + a.ext + ' · ' + esc(a.tarea) + ' · ' + esc(mesInfo(MES).etiqueta) + '</div>' +
@@ -1685,6 +1759,7 @@ $('selMes').addEventListener('change', (ev) => {
   render();
 });
 $('btnPng').addEventListener('click', exportarPng);
+$('btnSalir').addEventListener('click', () => salir());
 $('tabs').addEventListener('click', (ev) => { const b = ev.target.closest('[data-tab]'); if (b) { TAB = b.dataset.tab; render(); window.scrollTo(0, 0); } });
 $('main').addEventListener('click', (ev) => {
   const f = ev.target.closest('[data-ficha]');
