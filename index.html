@@ -485,6 +485,18 @@ async function refrescar() {
   if (TAB === 'carga' && CARGA_MES && RESP.datos[CARGA_MES]) MES = CARGA_MES;
   render();
   setSync('Actualizado ' + horaCorta(r.generado), '');
+  conectarTorre();
+}
+
+/** Campañas automáticas: el Apps Script necesita la clave de la Torre. Se la pasa la web del admin (la que ya guarda este navegador). */
+let TORRE_ENVIADA = false;
+function conectarTorre() {
+  if (MODO_MOCK || TORRE_ENVIADA || !RESP || !RESP.esAdmin || RESP.torreConectada) return;
+  let clave = '';
+  try { clave = localStorage.getItem('torre-clave-acceso') || ''; } catch (e) {}
+  if (!clave) return;
+  TORRE_ENVIADA = true;
+  apiPost('guardarClaveTorre', { clave: clave }).then((r) => { if (r.ok) RESP.torreConectada = true; }).catch(() => {});
 }
 
 function elegirMes() {
@@ -1489,7 +1501,7 @@ function tarjetaCampanias(etiqueta, porNom, porNombre) {
     (!r.extras.length && (!r.dias3cx || r.diasTorre[0] > CAMP.mes + '-01') ? '<div class="aviso-extra">⚠ La Torre no tiene las salientes de todo el mes' + (r.dias3cx ? ' (arrancan el ' + esc(fechaCorta(r.diasTorre[0])) + ')' : '') + ': las ganadas de los otros días no van a tener respaldo. Sumá el CSV de salientes de 3CX del mes (outbound_calls) con el botón de arriba.</div>' : '') +
     (r.sinMapear.length ? '<div class="aviso-extra">⚠ Agentes de las planillas que no son de tus 6: ' + esc(r.sinMapear.join(', ')) + ' (se ignoran).</div>' : '') + '</div></div></div>';
   let h = '<div class="h-sec">Campañas · ' + esc(etiqueta) + '</div><div class="card"><div class="sub">Cuentan solo las ganadas (Agendado) con una llamada <b>atendida</b> en 3CX a ese cliente. Quien gestionó todos los clientes de su planilla suma hasta 5 puntos más (tope 15).</div>' +
-    '<div class="acciones"><button class="btn pri" type="button" id="btnTorre">Traer de Torre de control</button>' + (r ? '<span class="btn file">Sumar salientes de 3CX (CSV)<input type="file" accept=".csv,text/csv" id="campSalientes" multiple></span>' : '') + '</div>' + aviso +
+    '<p class="nota">' + (RESP.torreConectada ? '✓ Se actualizan solas cada hora desde la Torre de control. El botón es para traerlas ya y revisar el detalle.' : '⚠ Todavía no se actualizan solas: entrá una vez a la Torre de control en este navegador y volvé a abrir esta web.') + '</p>' + '<div class="acciones"><button class="btn pri" type="button" id="btnTorre">Traer de Torre de control</button>' + (r ? '<span class="btn file">Sumar salientes de 3CX (CSV)<input type="file" accept=".csv,text/csv" id="campSalientes" multiple></span>' : '') + '</div>' + aviso +
     '<form id="fCamp"><div class="scroll"><table class="t" style="margin-top:10px"><thead><tr><th>Agente</th><th class="r">Asignadas</th><th class="r">Gestionadas</th><th class="r">Ganadas</th><th class="r">Con respaldo</th><th>Gestionó todas</th></tr></thead><tbody>' +
     porNom.map((ag) => {
       if (!ag.campanas) return '<tr><td class="txt">' + esc(ag.nombre) + '</td><td colspan="5" class="muted">Recepción · 15 fijos</td></tr>';
