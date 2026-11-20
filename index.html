@@ -511,7 +511,7 @@ function render() {
   const sel = $('selMes');
   sel.hidden = !RESP.meses.length;
   sel.innerHTML = RESP.meses.map((m) => '<option value="' + m.mes + '"' + (m.mes === MES ? ' selected' : '') + '>' +
-    esc(m.etiqueta) + (admin && !m.publicado ? ' · borrador' : '') + '</option>').join('');
+    esc(m.etiqueta) + (m.enCurso ? ' · en curso' : '') + (admin && !m.publicado ? ' · borrador' : '') + '</option>').join('');
   // Pestañas
   const tabs = [['ranking', 'Ranking'], ['especiales', 'Evaluación especial'], ['puntaje', 'Cómo se calcula']];
   if (!admin && !esEspecial(yo)) tabs.splice(1, 1);   // los agentes regulares no ven la evaluación especial
